@@ -3,7 +3,7 @@
 
 #define INPUT_LINE_MAX 1024
 
-
+#define EXIT_COMMAND_NOT_FOUND (int)127
 
 /*------------------ COLOR MACROS ---------------------------------*/
 #define COLOR_RESET(stream)    fprintf(stream, "\033[0m")

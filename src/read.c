@@ -1,9 +1,12 @@
 #include <minishell.h>
 #include <log.h>
 
-void read_line_input(char* buff, size_t max) {
-    PROMPT_PRINT();
+int read_line_input(char* buff, size_t max) {
     size_t buff_len = 0;
+    tline* line = NULL;
+    int ret = 0;
+
+    PROMPT_PRINT();
     fgets(buff, max, stdin);
 
     /** Si hay un caracter '\n' al final significa que el usuario 
@@ -16,10 +19,17 @@ void read_line_input(char* buff, size_t max) {
     buff_len = strlen(buff);
     if (buff[buff_len - 1] == '\n') {
         buff[buff_len-- - 1] = '\0';
-        INFO("%s", buff);
-        //execute_command(buff)
+
+        line = tokenize(buff);
+        if (line != NULL) {
+            ret = execute_command(line);
+            g_last_error_code = ret;
+            return ret;
+        }
+        return -1;
     } else {
         fputc('\n', stdout);
+        return 0;
     }
     
 }

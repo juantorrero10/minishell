@@ -11,7 +11,7 @@ BIN_DIR=build/bin
 SRC_DIR=src
 
 # .c files are especified here
-SRC = main.c read.c prompt.c init.c env.c
+SRC = main.c read.c prompt.c init.c env.c command/execute.c command/builtin.c
 
 # .a files inside ./$(LIB_DIR) no 'lib-' prefix nor '.a' extension
 LIB = parser64
@@ -21,7 +21,7 @@ LIB_FLAGS = $(addprefix -l, $(LIB))
 OBJ=$(SRC:%.c=$(OBJ_DIR)/%.o)
 BIN=$(BIN_DIR)/$(TARGET)
 
-CCFLAGS = -Wall -Wextra -g -m64 -std=c17 -I$(INC_DIR)
+CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
 
 
 # --------------- COLORS -------------------------
@@ -35,11 +35,10 @@ RED    = \033[0;91m
 all:$(BIN)
 
 # Compile (*.c -> *.o)
-$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OBJ_DIR)
+$(OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OBJ_DIR) $(OBJ_DIR)/command
 	@echo "$(PURPLE)--------------------------------------------------------------------------"
-	@echo "	Compiling: $(CYAN)$< $(PURPLE) ...$(WHITE)"
+	@echo "	Compiling: $(CYAN)$< $(PURPLE) -> $(RED) $@ $(WHITE)"
 	$(CC) $(CCFLAGS) -c $< -o $@
-	@echo " "
 
 # Linking (*.o -> binary)
 $(BIN) : $(OBJ) | $(BIN_DIR)
@@ -48,9 +47,15 @@ $(BIN) : $(OBJ) | $(BIN_DIR)
 	$(CC) $(CCFLAGS) -o $@ $(OBJ) -L$(LIB_DIR) $(LIB_FLAGS)
 	@echo " "
 
-# Create directories
-$(BIN_DIR) $(OBJ_DIR):
-	@mkdir -p $@
+# Directories
+$(BIN_DIR):
+	mkdir -p $@
+
+$(OBJ_DIR):
+	mkdir -p $@
+
+$(OBJ_DIR)/command: | $(OBJ_DIR)
+	mkdir -p $@
 
 clean:
 	@echo "$(RED)Removing .o files$(WHITE)"

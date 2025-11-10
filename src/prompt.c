@@ -17,6 +17,8 @@ static void get_username(char** out) {
     *out = env_get_var("USER", &len);
 }
 
+int prompt_get_last_errorcode() { return g_last_error_code;}
+
 /**
  * @brief Imprime la ruta actual en la que se encuentra la terminal.
  * @note Esta function reemplaza la cadena /home/{usuario} con '~', al igual que bash. 
@@ -50,7 +52,7 @@ void prompt_print_username(void) {
 }
 
 void prompt_print_last_errorcode() {
-    printf("%ld", 0L);
+    printf("%d", prompt_get_last_errorcode());
 }
 
 void prompt_print_str(char* s) { printf("%s", s);}
