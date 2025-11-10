@@ -1,37 +1,46 @@
+/**
+ * En este archivo se almacenan funciones para la personalizacion del "prompt".
+ * El prompt es la informacion que aparece antes de donde el usuario escribe el commando.
+ * Suele contener la ruta actual, el nombre usuario o la rama de git en la que se encuentra.
+ * El prompt se personaliza en el archivo "prompt.h"
+ */
+
+
 #include <minishell.h>
 
 /**
- * @brief Get username through getlogin()
- * if it fails use getuid() 
+ * @brief Obtener cadena del nombre del usuario.
  */
 static void get_username(char** out) {
-    *out = getlogin();
+    size_t len = 0;
 
-    if (!*out) {
-        struct passwd *pw = getpwuid(getuid());
-        if (pw)
-            *out = pw->pw_name;
-    }
-    if (!*out) strcpy(*out, "unknown");
+    *out = env_get_var("USER", &len);
 }
 
-void prompt_print_cwd() {
-    char buff[128];
-    getcwd(buff, 128);
+/**
+ * @brief Imprime la ruta actual en la que se encuentra la terminal.
+ * @note Esta function reemplaza la cadena /home/{usuario} con '~', al igual que bash. 
+ */
+void prompt_print_cwd(bool abrv_home) {
+    char pwd[128];
+    char home[128];
+    size_t sz_home = 0;
+    
+    getcwd(pwd, 128);
 
-    // Substitude /home/{user} with ~
-    char buff2[128];
-    strcpy(buff2, "/home/");
-    char* username; get_username(&username);
-    strcat(buff2, username);
+    // Sustituir /home/{user} con ~
+    if (abrv_home)
+    {
+        strcpy(home, env_get_var("HOME", &sz_home));
 
-    // If /home/{user} substring is at the start of the string.
-    if (strncmp(buff, buff2, strlen(buff2)) == 0) {
-        // Print ~ + rest of path
-        printf("~%s", buff + strlen(buff2));
-    } else {
-        printf("%s", buff);
+        // Si la subcadena /home/{user} esta al principio de la ruta ->
+        if (strncmp(pwd, home, sz_home) == 0) {
+            // Sustituir con ~
+            printf("~%s", pwd + sz_home);
+            return;
+        }
     }
+    printf("%s", pwd);
 }
 
 void prompt_print_username(void) {

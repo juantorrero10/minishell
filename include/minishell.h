@@ -1,19 +1,24 @@
-#ifndef INCLUDE_H_
-#define INCLUDE_H_
+#ifndef MINISHELL_H_
+#define MINISHELL_H_
+
+#define __DEBUG
+#define _out_
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdint.h>
 #include <stddef.h>
-#include <pwd.h>     // passwd and getpwuid()
-#include <sys/types.h> //  uid_t
+#include <signal.h>
+#include <stdbool.h>
 
 #include <parser.h>
 #include <macros.h>
 #include <prompt.h>
 #include <read.h>
+#include <init.h>
+#include <env.h>
 
-#define __DEBUG
+#endif // MINISHELL_H_
 
-#endif // INCLUDE_H_

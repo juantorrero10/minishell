@@ -3,7 +3,7 @@
 
 #include <minishell.h>
 
-void get_line_input(char* buff, size_t max);
+void read_line_input(char* buff, size_t max);
 
 
 #endif // READ_H_
