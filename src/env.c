@@ -10,28 +10,13 @@
 char* env_get_var(
     char* name, _out_ size_t* var_length) {
 
-    char* curr_var = NULL;
+    char *ret = NULL;
     *var_length = 0;
-    size_t name_sz = 0;
-    char* eq = NULL;
-    char* ret = NULL;
 
-    for (size_t i = 0; i < g_num_envvars; i++)
-    {
-        curr_var = environ[i];
-        eq = strchr(curr_var, '=');
-        name_sz = (size_t)(eq - curr_var);
-        curr_var[name_sz] = '\0';
-        if (!strcmp(curr_var, name)) {
-            curr_var[name_sz] = '=';
-            ret = curr_var + name_sz + 1;
-            *var_length = strlen(ret);
-            return ret;
-        }
-        curr_var[name_sz] = '=';
-        
-    }
+    ret = getenv(name);
     if (!ret)WARN("'%s' was not found", name);
+    else *var_length = strlen(ret);
+
     return ret;
 }
 
@@ -139,7 +124,10 @@ tline* env_expand_wholeline(const tline* og) {
         // Hacer la tabla de punteros (argv**) y copiar argv[0]
         if (og->commands[i].argv && og->commands[i].argv[0]) {
             sz = strlen(og->commands[i].argv[0]) + 1;
-            c.argv = malloc(sizeof(char*) * og->commands[i].argc);
+
+            // Aprovechamos para añadir string nula al final de cada lista de argumentos
+            // es necesario a la hora de ejercutar comandos
+            c.argv = malloc(sizeof(char*) * (og->commands[i].argc + 1));
             c.argv[0] = malloc(sz);
             strcpy(c.argv[0], og->commands[i].argv[0]);
         }
@@ -153,6 +141,8 @@ tline* env_expand_wholeline(const tline* og) {
             c.argv[j] = malloc(sz + 1);
             memcpy(c.argv[j], tmp, sz + 1);
         }
+        // Añadir la string nula
+        c.argv[og->commands[i].argc] = NULL;
         new->commands[i].argv = c.argv;
     }
     return new;

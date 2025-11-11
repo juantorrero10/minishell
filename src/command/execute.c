@@ -32,7 +32,6 @@ static int find_builtin(char* c) {
     }
     return EXIT_COMMAND_NOT_FOUND;
 }
-
 #ifdef __DEBUG
 static void print_command(tline* tokens) {
     int __i = 0;
@@ -44,6 +43,7 @@ static void print_command(tline* tokens) {
         {
             INFO("ARG%d: %s", __j, tokens->commands[__i].argv[__j]);
         }
+        
     }
 
     INFO("> : %s", tokens->redirect_output);
@@ -54,6 +54,74 @@ static void print_command(tline* tokens) {
 
 #endif
 
+static int launch_external(int i, tline *tokens, struct file_streams fss, job_t* job, int* pipe_fd, int* prev_pipe) {
+    pid_t pid = 0;
+    int n = 0;
+    
+    n = tokens->ncommands;
+    // Si no es el último
+    if ( i < (n - 1)) {
+        if (pipe(pipe_fd) == -1) {
+            MSH_ERR("error creating pipe");
+            perror("pipe");
+            return EXIT_ERROR_CREATING_PIPE;
+        }
+    }
+    pid = fork();
+    if (pid == -1) {
+        MSH_ERR("fork of '%s' failed", tokens->commands[i].argv[0]);
+        perror("fork"); return EXIT_ERROR_FORKING;
+    };
+    /**
+     * "Entrada normal": stdin o archivo
+     * "Salida normal" : stdout o archivo
+     */
+
+    if (pid == 0) {
+        /*--------------------- PROCESO HIJO ---------------------*/
+
+        // Cambiar stdin por la entrada normal o la salida del proceso anterior.
+        if (i == 0) {
+            // Cerrar archivo para no impedir al programa abrirlo.
+            if (fss.in != stdin) {dup2(fileno(fss.in), STDIN_FILENO); fclose(fss.in);}
+        }
+        else {dup2(*prev_pipe, STDIN_FILENO); close(*prev_pipe);}
+
+        // Cambiar stdout por la entrada del siguiente o salida normal
+        if (i == (n - 1)) {
+            if (fss.out != stdout) { dup2(fileno(fss.out), STDOUT_FILENO); fclose(fss.out); }
+            if (fss.err != stderr) { dup2(fileno(fss.err), STDERR_FILENO); fclose(fss.err); }
+        } else 
+        {
+            dup2(pipe_fd[1], STDOUT_FILENO); 
+            close(pipe_fd[0]);
+        }
+
+
+        //Ejecutar comando
+        execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
+        perror(tokens->commands[i].filename);
+        // Terminar ejecuccion del proceso hijo.
+        exit(1);
+
+    } else {
+        /*--------------------- PROCESO PADRE ---------------------*/
+        job->pids[i] = pid;
+        if (i == 0) job->pgid = pid;
+        // Si no es el primero, cerrar la anterior
+        if (*prev_pipe != -1) close(*prev_pipe);
+        // Si no es el ultimo, 
+        if (i < (n - 1)) {
+            close(pipe_fd[1]);
+            *prev_pipe = pipe_fd[0];
+        }
+        if (tokens->background) {
+            MSH_LOG("%s: ended", job->cmdline);
+        }
+        return 0;
+    }
+}
+
 /**
  * @brief ejecutar una serie de commandos.
  */
@@ -63,7 +131,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     int ret = 0, status;
     int pipe_fd[2];
     int prev_pipe_fd = -1;
-    pid_t pid;
+    bool last_internal = 0;
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
 
@@ -77,6 +145,7 @@ int execute_command(tline* tokens, const char* cmdline) {
 
     for (int i = 0; i < tokens->ncommands; i++)
     {
+        last_internal = 0;
         // Si es el primero, permitir redirecciones de stdin
         if (i == 0 && tokens->redirect_input) {
             fss.in= fopen(tokens->redirect_input, "r+");
@@ -103,66 +172,12 @@ int execute_command(tline* tokens, const char* cmdline) {
                 }
             }
         }
-        if (is_external(tokens, i)) {
-            // Si no es el último
-            if ( i < (tokens->ncommands - 1)) {
-                if (pipe(pipe_fd) == -1) {
-                    MSH_ERR("error creating pipe");
-                    perror("pipe");
-                    ret = EXIT_ERROR_CREATING_PIPE; break;
-                }
-            }
-            pid = fork();
-            if (pid == -1) {
-                MSH_ERR("fork of '%s' failed", tokens->commands[i].argv[0]);
-                perror("fork"); ret = EXIT_ERROR_FORKING; break;
-            };
-            /**
-             * "Entrada normal": stdin o archivo
-             * "Salida normal" : stdout o archivo
-             */
-
-            if (pid == 0) {
-                /*--------------------- PROCESO HIJO ---------------------*/
-
-                // Cambiar stdin por la entrada normal o la salida del proceso anterior.
-                if (i == 0) {
-                    // Cerrar archivo para no impedir al programa abrirlo.
-                    if (fss.in != stdin) {dup2(fileno(fss.in), STDIN_FILENO); fclose(fss.in);}
-                }
-                else {dup2(prev_pipe_fd, STDIN_FILENO); close(prev_pipe_fd);}
-
-                // Cambiar stdout por la entrada del siguiente o salida normal
-                if (i == (tokens->ncommands - 1)) {
-                    if (fss.out != stdout) { dup2(fileno(fss.out), STDOUT_FILENO); fclose(fss.out); }
-                    if (fss.err != stderr) { dup2(fileno(fss.err), STDERR_FILENO); fclose(fss.err); }
-                } else 
-                {
-                    dup2(pipe_fd[1], STDOUT_FILENO); 
-                    close(pipe_fd[0]);
-                }
 
 
-                //Ejecutar comando
-                execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
-                perror(tokens->commands[i].filename);
-                // Terminar ejecuccion del proceso hijo.
-                exit(1);
-
-            } else {
-                /*--------------------- PROCESO PADRE ---------------------*/
-                job.pids[i] = pid;
-                if (i == 0) job.pgid = pid;
-                // Si no es el primero, cerrar la anterior
-                if (prev_pipe_fd != -1) close(prev_pipe_fd);
-                // Si no es el ultimo, 
-                if (i < (tokens->ncommands - 1)) {
-                    close(pipe_fd[1]);
-                    prev_pipe_fd = pipe_fd[0];
-                }
-            }
-        } 
+        if (is_external(tokens, i))
+            ret = launch_external(i, tokens, fss, &job, pipe_fd, &prev_pipe_fd);
         else {
+            last_internal = 1;
             builtin_idx = find_builtin(tokens->commands[i].argv[0]);
             if (builtin_idx == EXIT_COMMAND_NOT_FOUND) {
                 MSH_ERR("%s: command not found", tokens->commands[i].argv[0]);
@@ -178,11 +193,10 @@ int execute_command(tline* tokens, const char* cmdline) {
         for (int i = 0; i < tokens->ncommands; i++)
         {
             waitpid(job.pids[i], &status, 0);
-        }  ret = WEXITSTATUS(status);
+        }  if (!last_internal)ret = WEXITSTATUS(status);
         
     } else {
         MSH_LOG("[%d]: %d", 1, job.pgid);
-        //STORE JOB
     }
 
     close_file_streams(fss);

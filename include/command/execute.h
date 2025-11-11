@@ -12,15 +12,15 @@
                             COLOR_RESET(stderr);                                    \
                             fprintf(stderr, MSG"\r\n", ##__VA_ARGS__)
 
-#define MSH_LOG_C(stream, MSG, ...) COLOR_BRIGHT_BLUE(stream);                                                                      \
-                            fprintf(stream, "minishell: ");                         \
-                            COLOR_RESET(stream);                                    \
-                            fprintf(stream, MSG"\r\n", ##__VA_ARGS__)
+#define MSH_LOG_C(MSG, ...) COLOR_BRIGHT_BLUE(fss.out);                                                                      \
+                            fprintf(fss.out, "minishell: ");                         \
+                            COLOR_RESET(fss.out);                                    \
+                            fprintf(fss.out, MSG"\r\n", ##__VA_ARGS__)
 
-#define MSH_ERR_C(stream, MSG, ...) COLOR_RED(stream);                                                             \
-                            fprintf(stream, "minishell: ");                         \
-                            COLOR_RESET(stream);                                    \
-                            fprintf(stream, MSG"\r\n", ##__VA_ARGS__)
+#define MSH_ERR_C(MSG, ...) COLOR_RED(fss.err);                                                             \
+                            fprintf(fss.err, "minishell: ");                         \
+                            COLOR_RESET(fss.err);                                    \
+                            fprintf(fss.err, MSG"\r\n", ##__VA_ARGS__)
 
 typedef struct job {
     pid_t *pids;          // PIDs de los procesos hijos.

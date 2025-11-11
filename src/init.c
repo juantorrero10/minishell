@@ -23,8 +23,12 @@ builtin_t g_builtin_function_table[] = {
         {"umask", builtin_umask},
         {"jobs", builtin_jobs},
         {"fg", builtin_fg},
+        {"werror", builtin_whaterror},
+        {"set", builtin_set},
+        {"unset", builtin_unset},
+        {"whaterror", builtin_whaterror},
         {NULL, NULL}
-    };;
+    };
 
 
 /**
@@ -73,7 +77,7 @@ static int init_shell_env(const char *argv0) {
         return -1;
     }
 
-    INFO("changed $SHELL to: %s", getenv("SHELL"));
+    OKAY("changed $SHELL to: %s", getenv("SHELL"));
     return 0;
 }
 
@@ -81,7 +85,6 @@ static int init_shell_env(const char *argv0) {
 void init_minishell(int argc, char** argv) {
     (void)argc;
     size_t idx = 0;
-    
     init_install_signit_handler();
     if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
 
@@ -93,5 +96,6 @@ void init_minishell(int argc, char** argv) {
 #ifndef __DEBUG
     printf("%s", banner);
 #endif
+    INFO("TERMINAL PID: %d", getpid());
     INFO("DEBUG MODE");
 }

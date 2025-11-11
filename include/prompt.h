@@ -35,12 +35,12 @@ int prompt_get_last_errorcode();
  *  definidas en `macros.h` para ello.
  */
 #define PROMPT_PRINT()  LAST_ERROR();                   \
-                        COLOR_YELLOW(stdout);           \
+                        COLOR_BRIGHT_GREEN(stdout);    \
                         STYLE_ITALIC(stdout);             \
                         prompt_print_username();        \
                         COLOR_RESET(stdout);            \
                         prompt_print_str(" at ");       \
-                        COLOR_BRIGHT_BLUE(stdout);      \
+                        COLOR_CYAN(stdout);      \
                         prompt_print_cwd(1);            \
                         COLOR_RESET(stdout);            \
                         prompt_print_str(" ");          \

@@ -1,7 +1,6 @@
 #ifndef MINISHELL_H_
 #define MINISHELL_H_
 
-#define __DEBUG
 #define _out_
 
 //Necesario para sigaction y otras definiciones que dependen de la defincion de este macro.

@@ -23,6 +23,10 @@ BIN=$(BIN_DIR)/$(TARGET)
 
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
 
+ifdef DEBUG
+CCFLAGS += -D__DEBUG
+endif
+
 
 # --------------- COLORS -------------------------
 WHITE  = \033[0;39m
