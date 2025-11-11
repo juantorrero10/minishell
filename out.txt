@@ -1,2 +1,0 @@
-minishell: exit: too many arguments
-minishell: cd: '$PATH' is not a directory
