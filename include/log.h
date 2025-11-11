@@ -30,16 +30,16 @@ fprintf(stderr,                                              \
 } while (0)
 
 #else
-#define NL()
-#define SEP()
-#define LOG_SUCCESS(MSG, ...)
-#define LOG(MSG, ...)
-#define OKAY(MSG, ...)
-#define WARN(MSG, ...)
-#define INFO(MSG, ...)
-#define PRINT_ERROR(FUNCTION_NAME, errorcode)
-#define INDENTED(MSG, ...)
-#define DUMP(MSG, ...)
+#define NL() (void)0
+#define SEP() (void)0
+#define LOG_SUCCESS(MSG, ...) (void)0
+#define LOG(MSG, ...) (void)0
+#define OKAY(MSG, ...) (void)0
+#define WARN(MSG, ...) (void)0
+#define INFO(MSG, ...) (void)0
+#define PRINT_ERROR(FUNCTION_NAME, errorcode) (void)0
+#define INDENTED(MSG, ...) (void)0
+#define DUMP(MSG, ...) (void)0
 #endif //DO_LOG
 
 #endif // LOG_H_

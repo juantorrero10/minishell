@@ -6,7 +6,9 @@ int read_line_input(char* buff, size_t max) {
     tline* line = NULL;
     int ret = 0;
 
+    // Imprimir el "prompt"
     PROMPT_PRINT();
+
     fgets(buff, max, stdin);
 
     /** Si hay un caracter '\n' al final significa que el usuario 
@@ -23,6 +25,7 @@ int read_line_input(char* buff, size_t max) {
         line = tokenize(buff);
         if (line != NULL) {
             ret = execute_command(line);
+            // Actualizar el último codigo de error.
             g_last_error_code = ret;
             return ret;
         }

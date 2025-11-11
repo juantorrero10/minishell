@@ -9,16 +9,16 @@
 /**
  *  exit [code]
  */
-int builtin_exit (int c, char** v){
+int builtin_exit (int c, char** v, struct file_streams fss){
     int code = 0;
 
     if (c > 2) {
-        printf("minishell: exit: too many arguments\n");
+        MSH_ERR_C(fss.err, "exit: too many arguments");
         return 0;
     }
     if (c == 2) {
         if (!strcmp("--help", v[1])) {
-            printf("minishell: exit: Usage: %s [code]\n", v[0]);
+            MSH_LOG_C(fss.out, "exit: Usage: %s [code]", v[0]);
             return code;
         }
         code = atoi(v[1]);
@@ -29,23 +29,25 @@ int builtin_exit (int c, char** v){
 /**
  * cd [dir]
  */
-int builtin_chdir(int c, char** v){
+int builtin_chdir(int c, char** v, struct file_streams fss){
     int ret = 0;
 
     if (c > 2) {
-        printf("minishell: cd: too many arguments\n");
+        MSH_ERR_C(fss.err, "cd: too many arguments");
     }
     if (c == 2) {
         if (!strcmp("--help", v[1])) {
-            printf("minishell: cd: Usage: %s [dir]\n", v[0]);
+            MSH_LOG_C(fss.out, "cd: Usage: %s [dir]", v[0]);
             return ret;
         }
         ret = chdir(v[1]);
-        if (ret == -1) printf("minishell: cd: '%s' is not a directory\n", v[1]);
+        if (ret == -1) {
+            MSH_ERR_C(fss.err, "cd: '%s' is not a directory", v[1]);
+        }
     }
     return ret;
 }
-int builtin_echo (int c, char** v){ (void)c; (void)v; return 0L;}
-int builtin_umask(int c, char** v){ (void)c; (void)v; return 0L;}
-int builtin_jobs (int c, char** v){ (void)c; (void)v; return 0L;}
-int builtin_fg   (int c, char** v){ (void)c; (void)v; return 0L;}
+
+int builtin_umask(int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
+int builtin_jobs (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
+int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}

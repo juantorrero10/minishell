@@ -22,7 +22,6 @@ builtin_t g_builtin_function_table[] = {
         {"cd", builtin_chdir},
         {"chdir", builtin_chdir},
         {"umask", builtin_umask},
-        {"echo", builtin_echo},
         {"jobs", builtin_jobs},
         {"fg", builtin_fg},
         {NULL, NULL}

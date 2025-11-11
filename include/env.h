@@ -16,4 +16,11 @@ extern size_t g_num_envvars;  // # de variables de entorno.
 char* env_get_var(
     char* name, _out_ size_t* var_length);
 
+/**
+ * @brief expandir variables de entorno en una cadena
+ * @example "aaaa$HOME$USER $HOSTTYPE" -> "aaaa/home/{usuario}{usuario} x86_64"
+ * @attention la funcion que llama a esta es responsable de liberar la memoria del buffer de salida.
+ */
+char* env_expand_vars(const char* fmt, _out_ size_t* length);
+
 #endif // ENV_H_

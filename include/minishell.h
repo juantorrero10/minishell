@@ -1,7 +1,7 @@
 #ifndef MINISHELL_H_
 #define MINISHELL_H_
 
-#define __DEBUG
+//#define __DEBUG
 #define _out_
 
 
@@ -14,7 +14,9 @@
 #include <stddef.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <errno.h>    
 #include <sys/wait.h>
+#include <ctype.h>
 
 #include <parser.h>
 #include <macros.h>
