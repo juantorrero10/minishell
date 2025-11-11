@@ -23,4 +23,13 @@ char* env_get_var(
  */
 char* env_expand_vars(const char* fmt, _out_ size_t* length);
 
+/**
+ * @brief Expandir las variables del entorno en una linea de commandos entera.
+ * @note Debido a la estructura del proyecto no se permiten variables del entorno 
+ * en el primer argumento (el que dice el comando a ejecutar).
+ * @returns devuelve una copia de los tokens originales y debe ser liberada
+ *          tras su uso con free_tokens();
+ */
+tline* env_expand_wholeline(const tline* og);
+
 #endif // ENV_H_

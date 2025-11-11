@@ -23,7 +23,8 @@ int builtin_exit (int c, char** v, struct file_streams fss){
         }
         code = atoi(v[1]);
     }
-    exit(code);
+    g_exit_signal = 1;
+    return code;
 }
 
 /**

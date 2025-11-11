@@ -4,11 +4,9 @@
  * Minishell necesita antes que nada:
  *      -  Reemplazar el "handler" del las señales SIGINT para el propio shell y los procesos hijo.
  *      -  Obtener el numero de variables del entorno del sistema -> g_num_envvars
- *      ...
+ *      -  Cambiar la variable $SHELL por la de este programa.
  */
 
-//Necesario para sigaction y otras definiciones que dependen de la defincion de este macro.
-#define _XOPEN_SOURCE 700 
 #define _DEF_BANNER
 
 #include <minishell.h>
@@ -17,6 +15,7 @@
 /*-------Iniciar variables globales--------------- */
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
+bool g_exit_signal = 0;
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},
         {"cd", builtin_chdir},
@@ -55,13 +54,36 @@ static void init_install_signit_handler(void) {
     
 }
 
+/**
+ * @brief Cambiar la variable $SHELL por la de este binario.
+ */
+static int init_shell_env(const char *argv0) {
+    char path[PATH_MAX];
+
+    if (realpath(argv0, path) == NULL) {
+#ifdef __DEBUG
+        perror("realpath");
+#endif
+        return -1;
+    }
+    if (setenv("SHELL", path, 1) != 0) {
+#ifdef __DEBUG
+        perror("setenv");
+#endif
+        return -1;
+    }
+
+    INFO("changed $SHELL to: %s", getenv("SHELL"));
+    return 0;
+}
+
 
 void init_minishell(int argc, char** argv) {
-    (void)argc; (void)argv;
-    
+    (void)argc;
     size_t idx = 0;
     
     init_install_signit_handler();
+    if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
 
     //Obtener el numero de variables de entorno
     while(environ[idx++]) {
@@ -71,4 +93,5 @@ void init_minishell(int argc, char** argv) {
 #ifndef __DEBUG
     printf("%s", banner);
 #endif
+    INFO("DEBUG MODE");
 }

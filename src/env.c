@@ -1,5 +1,5 @@
 /**
- * Funciones de las variables del sistema como $PATH.
+ * Funciones de manejo de variables del entorno
  */
 #include <minishell.h>
 
@@ -41,8 +41,9 @@ char* env_expand_vars(const char* fmt, size_t* length) {
     char* output = calloc(1, alloc_size);
     bool paren = false;
     char varname[MAX_VARNAME_COPY];
-    if (!output) return NULL;
 
+    if (!fmt) return NULL;
+    if (!output) return NULL;
     while (fmt[idx]) {
         if (fmt[idx] == '$') {
             idx++;
@@ -102,4 +103,57 @@ char* env_expand_vars(const char* fmt, size_t* length) {
 
     *length = out_len;
     return output;
+}
+
+
+tline* env_expand_wholeline(const tline* og) {
+    tline* new = (tline*) malloc(sizeof(tline));
+    size_t sz = 0;
+    tcommand c = {0};
+    char* tmp = NULL;
+
+    // Copiar los contenidos "estaticos"
+    new->ncommands = og->ncommands;
+    new->background = og->background;
+    
+    // Copiar las variables expandidas
+    new->redirect_error = env_expand_vars(og->redirect_error, &sz);
+    new->redirect_input = env_expand_vars(og->redirect_input, &sz);
+    new->redirect_output = env_expand_vars(og->redirect_output, &sz);
+
+    new->commands = (tcommand*) malloc(sizeof(tcommand) * og->ncommands);
+
+    for (int i = 0; i < og->ncommands; i++)
+    {
+        c = (tcommand){0};
+        new->commands[i].argc = og->commands[i].argc;
+
+        //Copiar filename.
+        new->commands[i].filename = NULL;
+        new->commands[i].argv = NULL;
+        if (og->commands[i].filename) {
+            new->commands[i].filename = malloc(strlen(og->commands[i].filename));
+            strcpy(new->commands[i].filename, og->commands[i].filename);
+        }
+
+        // Hacer la tabla de punteros (argv**) y copiar argv[0]
+        if (og->commands[i].argv && og->commands[i].argv[0]) {
+            sz = strlen(og->commands[i].argv[0]) + 1;
+            c.argv = malloc(sizeof(char*) * og->commands[i].argc);
+            c.argv[0] = malloc(sz);
+            strcpy(c.argv[0], og->commands[i].argv[0]);
+        }
+        
+        // Expandir el resto de argumentos
+        for (int j = 1; j < og->commands[i].argc; j++)
+        {
+            tmp = env_expand_vars(
+                og->commands[i].argv[j], &sz);
+            
+            c.argv[j] = malloc(sz + 1);
+            memcpy(c.argv[j], tmp, sz + 1);
+        }
+        new->commands[i].argv = c.argv;
+    }
+    return new;
 }

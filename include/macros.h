@@ -2,8 +2,14 @@
 #define MACROS_H_
 
 #define INPUT_LINE_MAX 1024
+#define PATH_MAX 256
 
 #define EXIT_COMMAND_NOT_FOUND (int)-1
+#define EXIT_ERROR_OPENING_FILE (int)-2
+#define EXIT_ERROR_FORKING (int)-3
+#define EXIT_ERROR_CREATING_PIPE (int)-4
+
+#define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 
 /*------------------ COLOR MACROS ---------------------------------*/
 #define printf_if_std(stream, msg) (stream == stdout || stream == stderr)? fprintf(stream, msg) : (void)0
