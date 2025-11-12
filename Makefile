@@ -11,7 +11,7 @@ BIN_DIR=build/bin
 SRC_DIR=src
 
 # .c files are especified here
-SRC = main.c read.c prompt.c init.c env.c command/execute.c command/builtin.c command/job.c
+SRC = main.c read.c prompt.c init.c env.c signals.c command/execute.c command/builtin.c command/job.c
 
 # .a files inside ./$(LIB_DIR) no 'lib-' prefix nor '.a' extension
 LIB = parser64

@@ -34,48 +34,7 @@ builtin_t g_builtin_function_table[] = {
     };
 
 
-/**
- * @brief Handler de la SIGINT que no hace nada relevante.
- */
-static void sigint_handler(int sig) {
-    (void)sig; fflush(stdout);
-}
 
-static void sigchld_handler(int sig) {
-    (void)sig;
-    pid_t pid;
-    int status;
-    bool all_done;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        job_t* j = job_get(pid);
-        if (!j) continue;
-
-        // Marcar este proceso como terminado
-        for (int i = 0; i < j->nprocceses; i++) {
-            if (j->pids[i] == pid)
-                j->pids[i] = -1;
-        }
-
-        // 
-        all_done = true;
-        for (int i = 0; i < j->nprocceses; i++) {
-            if (j->pids[i] != -1) {
-                all_done = false;
-                break;
-            }
-        }
-
-        if (all_done) {
-            printf("\n");
-            MSH_LOG_NN("job [%d] '%s' done\t{%d}", j->id, j->cmdline, j->pgid);
-            j->state = DONE;
-        }
-    }
-
-    // Reinstalar señar, se pone por defecto en cada uso.
-    signal(SIGCHLD, sigchld_handler);
-}
 
 /**
  * @brief Reemplazar el handler por defecto de la señal de Ctrl^C.

@@ -39,6 +39,7 @@ fprintf(stderr,                                              \
 #define INFO(MSG, ...) (void)0
 #define PRINT_ERROR(FUNCTION_NAME, errorcode) (void)0
 #define INDENTED(MSG, ...) (void)0
+#define ERROR(MSG, ...) (void)0
 #define DUMP(MSG, ...) (void)0
 #endif //DO_LOG
 

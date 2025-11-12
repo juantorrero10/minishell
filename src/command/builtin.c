@@ -91,9 +91,8 @@ int builtin_umask(int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
 int builtin_jobs (int c, char** v, struct file_streams fss){ 
     (void)c; (void)v;
-    job_t* aa = g_bgjob_list; (void)aa;
-    size_t sss = g_sz_jobs;     (void)sss;
     job_t* curr;
+    job_state s;
 
     if (c > 1 && !strcmp(v[1], "--help")) {
         MSH_LOG_C("jobs: todo-> help message");
@@ -110,9 +109,17 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
     }
     fputc('\n', fss.out);
     curr = g_bgjob_list;
+    s = job_get_status(curr->pgid);
+    INFO("Read1: %d", curr->state);
+    job_checkupdate(curr, s, curr->state);
+    INFO("Read2: %d", curr->state);
     job_print(curr, fss.out);
     while(curr->next != NULL) {
-        curr = curr->next;
+        curr = curr->next; 
+        s = job_get_status(curr->pgid);
+        INFO("Read1: %d", curr->state);
+        job_checkupdate(curr, s, curr->state);
+        INFO("Read2: %d", curr->state);
         job_print(curr, fss.out);
     }
     return 0;

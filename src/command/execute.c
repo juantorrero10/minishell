@@ -33,6 +33,7 @@ static int find_builtin(char* c) {
     return EXIT_COMMAND_NOT_FOUND;
 }
 #ifdef __DEBUG
+/*
 static void print_command(tline* tokens) {
     int __i = 0;
     int __j = 0;
@@ -51,7 +52,7 @@ static void print_command(tline* tokens) {
     INFO(">&: %s", tokens->redirect_error);
     // cd $(PWD)/src > $(HOME)/out.txt
 }
-
+*/
 #endif
 
 static int launch_external(int i, tline *tokens, struct file_streams fss, job_t* job, int* pipe_fd, int* prev_pipe) {
@@ -136,10 +137,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
 
-#ifdef __DEBUG
-    print_command(tokens);
-#endif
-
     job.pids = malloc(sizeof(pid_t) * job.nprocceses);
     job.cmdline = malloc(strlen(cmdline) + 1);
     strcpy(job.cmdline, cmdline);
@@ -191,10 +188,13 @@ int execute_command(tline* tokens, const char* cmdline) {
     };
     /*_--------------------------- FINAL DEL BUCLE PRINCIPAL --------------------------------*/
     if (!tokens->background) {
+        //if (!tokens->redirect_input)tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
             waitpid(job.pids[i], &status, 0);
         }  if (!last_internal)ret = WEXITSTATUS(status);
+        //tcsetpgrp(STDIN_FILENO, getpid());
+
         
     } else {
         job.state = RUNNING;
@@ -204,6 +204,7 @@ int execute_command(tline* tokens, const char* cmdline) {
         MSH_LOG("job: [%d] %d", temp->id, job.pgid);
     }
 
+    job_update_status();
     close_file_streams(fss);
     free(job.pids);
     free(job.cmdline);

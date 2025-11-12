@@ -25,9 +25,12 @@
 #include <read.h>
 #include <init.h>
 #include <env.h>
+#include <signals.h>
 #include <command/execute.h>
 #include <command/builtin.h>
 #include <command/job.h>
+
+
 
 #endif // MINISHELL_H_
 

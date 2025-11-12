@@ -1,5 +1,5 @@
 #include <minishell.h>
-
+#include <log.h>
 
 void job_add(job_t j) {
     job_t* new = malloc(sizeof(job_t));
@@ -131,6 +131,7 @@ static void str_state(job_state s, char* buff) {
     case STOPPED:       strcpy(buff, "Stopped");break;
     case DONE:          strcpy(buff, "Done");break;
     case INTERRUPTED:   strcpy(buff, "Interrupted");break;
+    case WAITING:       strcpy(buff, "Waiting"); break;
     default:
         strcpy(buff, "Unknown");break;
     }
@@ -144,4 +145,67 @@ void job_print(job_t* j, FILE* stream){
     if (j->state >= 10) {
         job_rm(j->pgid);
     }
+}
+
+job_state job_get_status(pid_t pgid) {
+    FILE *f;
+    char s[20];
+    char buff[256];
+    char* ptr;
+    char state;
+    size_t idx = 0;
+    size_t sz = 0;
+
+    sprintf(s, "/proc/%d/stat", pgid);
+    f = fopen(s, "r");
+    if (!f) {
+        
+        ERROR("Couldn't get <%d>'s status: %s", pgid, strerror(errno));
+        return -1;
+    }
+    memset(buff, 0, (size_t)256);
+    fgets(buff, 256, f);
+    if ((sz = strlen(buff)) == 0) {return -1;}
+
+    ptr = strchr(buff, ' ');
+    idx = (size_t)(ptr - buff);
+    ptr = strchr(buff + idx + 1, ' ');
+    idx = (size_t)(ptr - buff);
+    state = buff[idx + 1];
+    switch (state)
+    {
+    case 'S':
+    case 'R':
+        return RUNNING;
+    case 'T':
+        return STOPPED;
+    case 'D':
+        return WAITING;
+    default:
+        return DONE;
+    }
+}
+
+void job_checkupdate(job_t* j, job_state new, job_state old) {
+    if ((int)new == -1) return;
+    if (new == old) return;
+    j->state = new;
+    if (new == STOPPED && old == RUNNING) {
+        MSH_LOG("Job [%d] '%s' stopped\t{%d}", j->id, j->cmdline, j->pgid);
+    } else if (new == WAITING && old == RUNNING) {
+        MSH_LOG("Job [%d] '%s' waiting\t{%d}", j->id, j->cmdline, j->pgid);
+    }
+}
+
+void job_update_status() {
+    job_t* curr;
+    job_state cs;
+
+    if (!g_bgjob_list) return;
+    curr = g_bgjob_list;
+    do {
+        cs = job_get_status(curr->pgid);
+        job_checkupdate(curr, cs, curr->state);
+        if (curr->next) curr = curr->next;
+    } while(curr->next != NULL);
 }
