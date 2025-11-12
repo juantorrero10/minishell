@@ -99,6 +99,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
 
 
         //Ejecutar comando
+        setpgid(pid, job->pgid);
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
         perror(tokens->commands[i].filename);
         // Terminar ejecuccion del proceso hijo.
@@ -108,15 +109,14 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
         /*--------------------- PROCESO PADRE ---------------------*/
         job->pids[i] = pid;
         if (i == 0) job->pgid = pid;
+        setpgid(pid, job->pgid);
+
         // Si no es el primero, cerrar la anterior
         if (*prev_pipe != -1) close(*prev_pipe);
         // Si no es el ultimo, 
         if (i < (n - 1)) {
             close(pipe_fd[1]);
             *prev_pipe = pipe_fd[0];
-        }
-        if (tokens->background) {
-            MSH_LOG("%s: ended", job->cmdline);
         }
         return 0;
     }
@@ -132,6 +132,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     int pipe_fd[2];
     int prev_pipe_fd = -1;
     bool last_internal = 0;
+    job_t* temp;
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
 
@@ -196,7 +197,11 @@ int execute_command(tline* tokens, const char* cmdline) {
         }  if (!last_internal)ret = WEXITSTATUS(status);
         
     } else {
-        MSH_LOG("[%d]: %d", 1, job.pgid);
+        job.state = RUNNING;
+        job.background = 1;
+        job_add(job);
+        temp = job_get(job.pgid);
+        MSH_LOG("job: [%d] %d", temp->id, job.pgid);
     }
 
     close_file_streams(fss);

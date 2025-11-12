@@ -22,13 +22,11 @@
                             COLOR_RESET(fss.err);                                    \
                             fprintf(fss.err, MSG"\r\n", ##__VA_ARGS__)
 
-typedef struct job {
-    pid_t *pids;          // PIDs de los procesos hijos.
-    pid_t pgid;           // ID de grupo.
-    int nprocceses;
-    int background;
-    char *cmdline;
-} job_t;
+#define MSH_LOG_NN(MSG, ...)   COLOR_BRIGHT_BLUE(stdout);                               \
+                            fprintf(stdout, "minishell: ");                         \
+                            COLOR_RESET(stdout);                                    \
+                            fprintf(stdout, MSG, ##__VA_ARGS__)
+
 
 struct file_streams {
     FILE* out;

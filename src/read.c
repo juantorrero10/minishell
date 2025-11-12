@@ -6,7 +6,7 @@
  * no el que se crea con tokenize() porque la libreria ya se encarga de él.
  */
 void free_tokens(tline* t) {
-
+    if (!t) return;
     if (t->redirect_error) free(t->redirect_error);
     if (t->redirect_input) free(t->redirect_input);
     if (t->redirect_output) free(t->redirect_output);

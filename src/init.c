@@ -3,6 +3,7 @@
  * lo que minishell necesita para funcionar.
  * Minishell necesita antes que nada:
  *      -  Reemplazar el "handler" del las señales SIGINT para el propio shell y los procesos hijo.
+ *      -  Reemplazar el handler de las señales SIGCHLG para notificar cuando los procesos en segundo plano terminan.
  *      -  Obtener el numero de variables del entorno del sistema -> g_num_envvars
  *      -  Cambiar la variable $SHELL por la de este programa.
  */
@@ -16,6 +17,8 @@
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
 bool g_exit_signal = 0;
+job_llist g_bgjob_list = NULL;
+size_t g_sz_jobs;
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},
         {"cd", builtin_chdir},
@@ -36,6 +39,42 @@ builtin_t g_builtin_function_table[] = {
  */
 static void sigint_handler(int sig) {
     (void)sig; fflush(stdout);
+}
+
+static void sigchld_handler(int sig) {
+    (void)sig;
+    pid_t pid;
+    int status;
+    bool all_done;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        job_t* j = job_get(pid);
+        if (!j) continue;
+
+        // Marcar este proceso como terminado
+        for (int i = 0; i < j->nprocceses; i++) {
+            if (j->pids[i] == pid)
+                j->pids[i] = -1;
+        }
+
+        // 
+        all_done = true;
+        for (int i = 0; i < j->nprocceses; i++) {
+            if (j->pids[i] != -1) {
+                all_done = false;
+                break;
+            }
+        }
+
+        if (all_done) {
+            printf("\n");
+            MSH_LOG_NN("job [%d] '%s' done\t{%d}", j->id, j->cmdline, j->pgid);
+            j->state = DONE;
+        }
+    }
+
+    // Reinstalar señar, se pone por defecto en cada uso.
+    signal(SIGCHLD, sigchld_handler);
 }
 
 /**
@@ -86,6 +125,7 @@ void init_minishell(int argc, char** argv) {
     (void)argc;
     size_t idx = 0;
     init_install_signit_handler();
+    signal(SIGCHLD, sigchld_handler);
     if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
 
     //Obtener el numero de variables de entorno

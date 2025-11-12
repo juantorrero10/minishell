@@ -88,7 +88,36 @@ int builtin_unset(int c, char** v, struct file_streams fss) {
 }
 
 int builtin_umask(int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
-int builtin_jobs (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
+
+int builtin_jobs (int c, char** v, struct file_streams fss){ 
+    (void)c; (void)v;
+    job_t* aa = g_bgjob_list; (void)aa;
+    size_t sss = g_sz_jobs;     (void)sss;
+    job_t* curr;
+
+    if (c > 1 && !strcmp(v[1], "--help")) {
+        MSH_LOG_C("jobs: todo-> help message");
+        return 0;
+    }
+
+    COLOR_BRIGHT_GREEN(fss.out);
+    fprintf(fss.out, "jobs: ");
+    COLOR_RESET(fss.out);
+
+    if (g_bgjob_list == NULL) {
+        fprintf(fss.out, "there are no jobs.\n");
+        return 0;
+    }
+    fputc('\n', fss.out);
+    curr = g_bgjob_list;
+    job_print(curr, fss.out);
+    while(curr->next != NULL) {
+        curr = curr->next;
+        job_print(curr, fss.out);
+    }
+    return 0;
+    
+}
 int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
 
 
