@@ -1,7 +1,7 @@
 #include <minishell.h>
 #include <log.h>
 
-void job_add(job_t j) {
+int job_add(job_t j) {
     job_t* new = malloc(sizeof(job_t));
     size_t sz = 0;
     job_t* curr, *next = (void*)-1;
@@ -27,7 +27,7 @@ void job_add(job_t j) {
     if (g_bgjob_list == NULL) {
         g_bgjob_list = new;
         g_sz_jobs++;
-        return;
+        return 1;
     }
     curr = g_bgjob_list;
     if (curr->priority == '-') curr->priority = ' ';
@@ -43,6 +43,7 @@ void job_add(job_t j) {
     new->next = next;
     new->id = curr->id + 1;
     g_sz_jobs++;
+    return new->id;
 }
 
 static void job_free(job_t* j) {
@@ -186,13 +187,13 @@ job_state job_get_status(pid_t pgid) {
     }
 }
 
-void job_checkupdate(job_t* j, job_state new, job_state old) {
+void job_checkupdate(job_t* j, job_state new, job_state old, bool notify) {
     if ((int)new == -1) return;
     if (new == old) return;
     j->state = new;
-    if (new == STOPPED && old == RUNNING) {
+    if (new == STOPPED && old == RUNNING && notify) {
         MSH_LOG("Job [%d] '%s' stopped\t{%d}", j->id, j->cmdline, j->pgid);
-    } else if (new == WAITING && old == RUNNING) {
+    } else if (new == WAITING && old == RUNNING && notify) {
         MSH_LOG("Job [%d] '%s' waiting\t{%d}", j->id, j->cmdline, j->pgid);
     }
 }
@@ -205,7 +206,7 @@ void job_update_status() {
     curr = g_bgjob_list;
     do {
         cs = job_get_status(curr->pgid);
-        job_checkupdate(curr, cs, curr->state);
-        if (curr->next) curr = curr->next;
-    } while(curr->next != NULL);
+        job_checkupdate(curr, cs, curr->state, true);
+        curr = curr->next;
+    } while(curr);
 }

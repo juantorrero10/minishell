@@ -65,12 +65,8 @@ clean:
 	@echo "$(RED)Removing .o files$(WHITE)"
 	@rm -rf $(OBJ_DIR)
 
-run: all
-	@echo "$(GREEN)$(BIN):$(WHITE)"
-	@./$(BIN)
-
 debug: all
 	$(DBG) ./$(BIN)
 
-.PHONY: all run clean debug
+.PHONY: all clean debug
 

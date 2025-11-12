@@ -13,10 +13,11 @@
 #include <minishell.h>
 #include <log.h>
 
-/*-------Iniciar variables globales--------------- */
+/*------- Inicializar variables globales--------------- */
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
 bool g_exit_signal = 0;
+job_t* g_curr_fg_job = NULL;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;
 builtin_t g_builtin_function_table[] = {
@@ -37,9 +38,9 @@ builtin_t g_builtin_function_table[] = {
 
 
 /**
- * @brief Reemplazar el handler por defecto de la señal de Ctrl^C.
+ * @brief Instalar señales.
  */
-static void init_install_signit_handler(void) {
+static void init_install_signals(void) {
     struct sigaction action;
 
     // Establecer la function las "flags"
@@ -52,6 +53,9 @@ static void init_install_signit_handler(void) {
         perror("sigaction");
         exit(1);
     }
+
+    signal(SIGCHLD, sigchld_handler);
+    signal(SIGTSTP, sigtstp_handle);
 
     
 }
@@ -83,8 +87,7 @@ static int init_shell_env(const char *argv0) {
 void init_minishell(int argc, char** argv) {
     (void)argc;
     size_t idx = 0;
-    init_install_signit_handler();
-    signal(SIGCHLD, sigchld_handler);
+    init_install_signals();
     if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
 
     //Obtener el numero de variables de entorno

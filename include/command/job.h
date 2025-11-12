@@ -23,12 +23,18 @@ typedef struct _job_desc {
 
 // Lista enlazada global de trabajos en segundo plano
 extern job_llist g_bgjob_list;
+
+// Numero de trabajos en segundo plano.
 extern size_t g_sz_jobs;
+
+// Trabajo actual en primer plano.
+extern job_t* g_curr_fg_job;
 
 /**
  * @brief Inserta un trabajo al final de la lista
+ * @returns id del 
  */
-void job_add(job_t j);
+int job_add(job_t j);
 
 job_t* job_get(pid_t pgid);
 pid_t job_get_pid(int id);
@@ -55,7 +61,7 @@ void job_print(job_t* j, FILE* stream);
 
 job_state job_get_status(pid_t pgid);
 void job_update_status();
-void job_checkupdate(job_t* j, job_state new, job_state old);
+void job_checkupdate(job_t* j, job_state new, job_state old, bool notify);
 
 
 

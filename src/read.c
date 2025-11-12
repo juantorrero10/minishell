@@ -56,6 +56,7 @@ int read_line_input(char* buff, size_t max) {
             if (g_exit_signal) {
                 exit(ret);
             }
+            INFO("end");
             return ret;
         }
         return -1;

@@ -7,6 +7,14 @@ void sigint_handler(int sig) {
     (void)sig; fflush(stdout);
 }
 
+void sigtstp_handle(int sig) {
+    WARN("SIGTSTP");
+    (void)sig; fflush(stdout);
+    
+    // Reinstalar señal.
+    signal(SIGTSTP, sigtstp_handle);
+}
+
 void sigchld_handler(int sig) {
     pid_t pid;
     int status;

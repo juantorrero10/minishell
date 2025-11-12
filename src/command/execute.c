@@ -101,6 +101,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
 
         //Ejecutar comando
         setpgid(pid, job->pgid);
+        INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
         perror(tokens->commands[i].filename);
         // Terminar ejecuccion del proceso hijo.
@@ -133,6 +134,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     int pipe_fd[2];
     int prev_pipe_fd = -1;
     bool last_internal = 0;
+    bool not_interrupted = 0;
     job_t* temp;
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
@@ -141,12 +143,19 @@ int execute_command(tline* tokens, const char* cmdline) {
     job.cmdline = malloc(strlen(cmdline) + 1);
     strcpy(job.cmdline, cmdline);
 
+    // Ignorar estas señales durante la ejecucion.
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+
+    // Restablecer SIGSTOP
+    signal(SIGTSTP, SIG_DFL);
+
     for (int i = 0; i < tokens->ncommands; i++)
     {
         last_internal = 0;
         // Si es el primero, permitir redirecciones de stdin
         if (i == 0 && tokens->redirect_input) {
-            fss.in= fopen(tokens->redirect_input, "r+");
+            fss.in= fopen(tokens->redirect_input, "r");
             if (!fss.in) {
                 MSH_ERR("%s: %s", tokens->redirect_input, strerror(errno));
                 ret = EXIT_ERROR_OPENING_FILE; break;
@@ -188,12 +197,25 @@ int execute_command(tline* tokens, const char* cmdline) {
     };
     /*_--------------------------- FINAL DEL BUCLE PRINCIPAL --------------------------------*/
     if (!tokens->background) {
-        //if (!tokens->redirect_input)tcsetpgrp(STDIN_FILENO, job.pgid);
+        tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
-            waitpid(job.pids[i], &status, 0);
-        }  if (!last_internal)ret = WEXITSTATUS(status);
-        //tcsetpgrp(STDIN_FILENO, getpid());
+            waitpid(job.pids[i], &status, WUNTRACED);
+            INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
+            if (WIFSTOPPED(status)) {
+                tcsetpgrp(STDIN_FILENO, getpid());
+                job.state = STOPPED;
+                job.background = 1;
+                job.id = job_add(job);  // Añadir trabajo a la lista
+                fputc('\n', stdout);
+                MSH_LOG("new job: [%d] %d (Stopped)", job.id, job.pgid);
+                ret = 0;
+                not_interrupted = 1;
+                signal(SIGTSTP, sigtstp_handle);
+                break;
+            }
+        }  if (!last_internal && !not_interrupted)ret = WEXITSTATUS(status);
+        tcsetpgrp(STDIN_FILENO, getpid());
 
         
     } else {
@@ -201,7 +223,7 @@ int execute_command(tline* tokens, const char* cmdline) {
         job.background = 1;
         job_add(job);
         temp = job_get(job.pgid);
-        MSH_LOG("job: [%d] %d", temp->id, job.pgid);
+        MSH_LOG("new job: [%d] %d", temp->id, job.pgid);
     }
 
     job_update_status();
