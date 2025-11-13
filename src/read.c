@@ -20,7 +20,6 @@ void free_tokens(tline* t) {
         if (t->commands[i].filename) free(t->commands[i].filename);
         
     }free(t->commands);
-    
 }
 
 int read_line_input(char* buff, size_t max) {
@@ -53,8 +52,16 @@ int read_line_input(char* buff, size_t max) {
             g_last_error_code = ret;
 
             free_tokens(expanded);
-            if (g_exit_signal) {
+            free(expanded);
+            if (g_exit_signal == 1) {
+                INFO("exit signal=1");
                 exit(ret);
+            }
+            if (g_exit_signal == 2) {
+                fputc('\n', stdout);
+                g_exit_signal = 0;
+                INFO("end, signal=2");
+                return ret;
             }
             INFO("end");
             return ret;

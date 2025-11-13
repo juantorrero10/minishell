@@ -19,7 +19,7 @@ typedef struct _builtin_function_struct
 extern builtin_t g_builtin_function_table[];
 
 // Señal de salida
-extern bool g_exit_signal;
+extern int g_exit_signal;
 
 // Funciones de comandos internos.
 int builtin_exit        (int, char**, struct file_streams);

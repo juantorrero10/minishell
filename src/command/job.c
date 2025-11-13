@@ -52,10 +52,7 @@ static void job_free(job_t* j) {
     free(j);
 }
 
-/**
- * @brief Elimina el trabajo de la lista.
- */
-static void job_rm(pid_t pgid) {
+void job_rm(pid_t pgid) {
     job_t* curr, *next;
     
     if (g_bgjob_list == NULL) return;
@@ -63,6 +60,7 @@ static void job_rm(pid_t pgid) {
     if (curr->pgid == pgid) {
         g_bgjob_list = curr->next;
         job_free(curr);
+        g_sz_jobs--;
         return;
     }
     next = curr->next;
@@ -74,6 +72,7 @@ static void job_rm(pid_t pgid) {
     } while(next);
     if (next) {
         curr->next = next->next;
+        g_sz_jobs--;
         job_free(next);
     }
 }

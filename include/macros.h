@@ -8,6 +8,7 @@
 #define EXIT_ERROR_OPENING_FILE (int)-2
 #define EXIT_ERROR_FORKING (int)-3
 #define EXIT_ERROR_CREATING_PIPE (int)-4
+#define EXIT_ERROR_CREATING_JOB (int)-5
 
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 

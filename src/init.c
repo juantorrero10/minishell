@@ -16,7 +16,7 @@
 /*------- Inicializar variables globales--------------- */
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
-bool g_exit_signal = 0;
+int g_exit_signal = 0;
 bool g_dont_nl = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;

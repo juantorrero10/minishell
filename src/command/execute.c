@@ -145,7 +145,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     int prev_pipe_fd = -1;
     bool last_internal = 0;
     bool not_interrupted = 0;
-    job_t* temp;
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
     // -----------------------------------------------------------
@@ -239,9 +238,13 @@ int execute_command(tline* tokens, const char* cmdline) {
     } else {
         job.state = RUNNING;
         job.background = 1;
-        job_add(job);
-        temp = job_get(job.pgid);
-        MSH_LOG("new job: [%d] %d", temp->id, job.pgid);
+        if (job.pgid) {
+            job.id = job_add(job);
+        } else if (!job.pgid) {
+            MSH_ERR_C("couldn't create '%s' job", cmdline);
+            return EXIT_ERROR_CREATING_JOB;
+        }
+        MSH_LOG("new job: [%d] %d", job.id, job.pgid);
     }
 
     job_update_status();
@@ -249,5 +252,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     free(job.pids);
     free(job.cmdline);
     signal(SIGTSTP, sigtstp_handle);
+    INFO("END execute_command");
     return ret;
 }

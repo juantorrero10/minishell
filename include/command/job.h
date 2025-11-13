@@ -29,9 +29,15 @@ extern size_t g_sz_jobs;
 
 /**
  * @brief Inserta un trabajo al final de la lista
- * @returns id del 
+ * @returns id del nuevo trabajo.
  */
 int job_add(job_t j);
+
+/**
+ * @brief Elimina el trabajo de la lista.
+ */
+void job_rm(pid_t pgid);
+
 
 job_t* job_get(pid_t pgid);
 job_t* job_get_plus();
