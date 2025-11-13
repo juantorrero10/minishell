@@ -128,6 +128,16 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
  * @brief ejecutar una serie de commandos.
  */
 int execute_command(tline* tokens, const char* cmdline) {
+    /** 
+     * Aqui estan los commandos que son externos pero se sobreescriben con un comando interno.
+     * La razon por la que se sobreescriben es para integrarlos mejor con la terminal.
+     * (ver su funcion builtin para mas detalles)
+     * 
+     * @note solo se puede sobreescribir el primer comando de la cadena.
+    */
+    char* command_overwrite[] = {"kill", NULL};
+    bool overwriten = 0;
+
     int builtin_idx = -1;
     struct file_streams fss = {.out = stdout, .in = stdin, .err = stderr};
     int ret = 0, status;
@@ -138,7 +148,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     job_t* temp;
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
-
+    // -----------------------------------------------------------
     job.pids = malloc(sizeof(pid_t) * job.nprocceses);
     job.cmdline = malloc(strlen(cmdline) + 1);
     strcpy(job.cmdline, cmdline);
@@ -149,6 +159,13 @@ int execute_command(tline* tokens, const char* cmdline) {
 
     // Restablecer SIGSTOP
     signal(SIGTSTP, SIG_DFL);
+
+    // Determinar si es necesario sobreescribir
+    while (command_overwrite[ret]) {
+        if (!strcmp(tokens->commands[0].argv[0], command_overwrite[ret++]))
+            overwriten = 1;
+    }
+    ret = 0;
 
     for (int i = 0; i < tokens->ncommands; i++)
     {
@@ -180,8 +197,7 @@ int execute_command(tline* tokens, const char* cmdline) {
             }
         }
 
-
-        if (is_external(tokens, i))
+        if (is_external(tokens, i) && !overwriten)
             ret = launch_external(i, tokens, fss, &job, pipe_fd, &prev_pipe_fd);
         else {
             last_internal = 1;
@@ -197,6 +213,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     };
     /*_--------------------------- FINAL DEL BUCLE PRINCIPAL --------------------------------*/
     if (!tokens->background) {
+        g_dont_nl = 1;
         tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
@@ -216,6 +233,7 @@ int execute_command(tline* tokens, const char* cmdline) {
             }
         }  if (!last_internal && !not_interrupted)ret = WEXITSTATUS(status);
         tcsetpgrp(STDIN_FILENO, getpid());
+        g_dont_nl = 0;
 
         
     } else {
@@ -230,5 +248,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     close_file_streams(fss);
     free(job.pids);
     free(job.cmdline);
+    signal(SIGTSTP, sigtstp_handle);
     return ret;
 }

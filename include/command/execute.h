@@ -36,4 +36,7 @@ struct file_streams {
 
 int execute_command(tline* tokens, const char* cmdline);
 
+// Flag para controlar los saltos de linea.
+extern bool g_dont_nl;
+
 #endif // COMMAND_EXECUTE_H_

@@ -17,7 +17,7 @@
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
 bool g_exit_signal = 0;
-job_t* g_curr_fg_job = NULL;
+bool g_dont_nl = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;
 builtin_t g_builtin_function_table[] = {
@@ -31,6 +31,7 @@ builtin_t g_builtin_function_table[] = {
         {"set", builtin_set},
         {"unset", builtin_unset},
         {"whaterror", builtin_whaterror},
+        {"kill", builtin_kill}, // Sobreescrito.
         {NULL, NULL}
     };
 

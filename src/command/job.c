@@ -4,7 +4,8 @@
 int job_add(job_t j) {
     job_t* new = malloc(sizeof(job_t));
     size_t sz = 0;
-    job_t* curr, *next = (void*)-1;
+    job_t* curr, *prev;
+    int highest = 0;
 
     //----  copiar contenidos. ----
     new->background = j.background;
@@ -12,7 +13,7 @@ int job_add(job_t j) {
     new->pgid = j.pgid;
     new->state = j.state;
     new->next = NULL;
-    new->priority = '+';
+    new->priority = 0;
     new->id = 1;
     
     sz = strlen(j.cmdline) + 1;
@@ -30,18 +31,16 @@ int job_add(job_t j) {
         return 1;
     }
     curr = g_bgjob_list;
-    if (curr->priority == '-') curr->priority = ' ';
-    if (curr->priority == '+') curr->priority = '-';
-    next = curr->next;
-    while(next != NULL) {
+    prev = NULL;
+    do {
+        if (curr->priority > highest) highest = curr->priority;
+        prev = curr;
         curr = curr->next;
-        next = curr->next;
-        if (curr->priority == '-') curr->priority = ' ';
-        if (curr->priority == '+') curr->priority = '-';
-    }
-    curr->next = new;
-    new->next = next;
-    new->id = curr->id + 1;
+    } while (curr);
+    prev->next = new;
+    new->next = NULL;
+    new->id = prev->id + 1;
+    new->priority = highest + 1;
     g_sz_jobs++;
     return new->id;
 }
@@ -58,28 +57,23 @@ static void job_free(job_t* j) {
  */
 static void job_rm(pid_t pgid) {
     job_t* curr, *next;
-    job_t* minus = NULL;
     
     if (g_bgjob_list == NULL) return;
     curr = g_bgjob_list;
-    if (curr->priority == '-') minus = curr;
     if (curr->pgid == pgid) {
         g_bgjob_list = curr->next;
-        g_sz_jobs--;
         job_free(curr);
         return;
-        
     }
     next = curr->next;
-    while(next != NULL && next->pgid != pgid) {
+    if (!next) return;
+    do {
+        if (next->pgid == pgid) break;
         curr = curr->next;
         next = curr->next;
-        if (curr->priority == '-') minus = curr;
-    }
-    if (next->pgid == pgid) {
+    } while(next);
+    if (next) {
         curr->next = next->next;
-        g_sz_jobs--;
-        if (next->priority == '+' && minus) minus->priority = '+';
         job_free(next);
     }
 }
@@ -109,15 +103,34 @@ job_t* job_get(pid_t pgid) {
     return r;
 }
 
-pid_t job_get_pid(int id) {
-    return id;
+job_t* job_get_plus() {
+    job_t* curr = NULL;
+    job_t* highest = NULL;
+
+    if (!g_bgjob_list) return NULL;
+    curr = g_bgjob_list;
+    highest = curr;
+    do {
+        if (curr->priority > highest->priority) highest = curr;
+        curr = curr->next;
+    } while(curr);
+    return highest;
 }
 
 int job_fg(pid_t pgid) {return pgid;}
 
+pid_t job_get_pid(int id) {
+    job_t* curr;
+    pid_t ret = -1;
 
-int job_bg(pid_t pgid) {return pgid;}
-
+    if (!g_bgjob_list)return ret;
+    curr = g_bgjob_list;
+    do {
+        if (curr->id == id) return curr->pgid;
+        curr = curr->next;
+    } while (curr);
+    return ret;
+}
 
 int job_stop(pid_t pgid) {return pgid;}
 int job_resume(pid_t pgid) {return pgid;}
@@ -131,18 +144,17 @@ static void str_state(job_state s, char* buff) {
     case RUNNING:       strcpy(buff, "Running");break;
     case STOPPED:       strcpy(buff, "Stopped");break;
     case DONE:          strcpy(buff, "Done");break;
-    case INTERRUPTED:   strcpy(buff, "Interrupted");break;
-    case WAITING:       strcpy(buff, "Waiting"); break;
     default:
         strcpy(buff, "Unknown");break;
     }
 }
 
-void job_print(job_t* j, FILE* stream){
+void job_print(job_t* j, FILE* stream, char priority){
     char buff[32];
-
+    
     str_state(j->state, buff);
-    fprintf(stream, "[%d]%c  %s\t\t%s\t{%d}\n", j->id, j->priority, buff, j->cmdline, j->pgid);
+    if(j->state == DONE) priority = ' ';
+    fprintf(stream, "[%d]%c  %s\t\t%s\t{%d}\n", j->id, priority, buff, j->cmdline, j->pgid);
     if (j->state >= 10) {
         job_rm(j->pgid);
     }
@@ -156,6 +168,7 @@ job_state job_get_status(pid_t pgid) {
     char state;
     size_t idx = 0;
     size_t sz = 0;
+    job_t* job;
 
     sprintf(s, "/proc/%d/stat", pgid);
     f = fopen(s, "r");
@@ -180,9 +193,9 @@ job_state job_get_status(pid_t pgid) {
         return RUNNING;
     case 'T':
         return STOPPED;
-    case 'D':
-        return WAITING;
     default:
+        job = job_get(pgid);
+        job->priority = 0;
         return DONE;
     }
 }
@@ -193,8 +206,6 @@ void job_checkupdate(job_t* j, job_state new, job_state old, bool notify) {
     j->state = new;
     if (new == STOPPED && old == RUNNING && notify) {
         MSH_LOG("Job [%d] '%s' stopped\t{%d}", j->id, j->cmdline, j->pgid);
-    } else if (new == WAITING && old == RUNNING && notify) {
-        MSH_LOG("Job [%d] '%s' waiting\t{%d}", j->id, j->cmdline, j->pgid);
     }
 }
 

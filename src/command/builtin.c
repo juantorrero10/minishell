@@ -93,7 +93,11 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
     (void)c; (void)v;
     job_t* curr;
     job_state s; (void)s;
+    int hightest, second;
+    char priority = ' ';
 
+    hightest = -1;
+    second = -1;
     if (c > 1 && !strcmp(v[1], "--help")) {
         MSH_LOG_C("jobs: todo-> help message");
         return 0;
@@ -109,17 +113,106 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
     }
     fputc('\n', fss.out);
     curr = g_bgjob_list;
+    hightest = curr->priority;
+    // Buscar los dos con prioridad mas alta.
     do {
+        if (curr->priority > hightest && curr->state != DONE) {
+            second = hightest;
+            hightest = curr->priority;
+        }
+        curr = curr->next;
+    } while(curr);
+
+    // Imprimir en pantalla.
+    curr = g_bgjob_list;
+    do {
+        priority = ' ';
         s = job_get_status(curr->pgid);
         INFO("Read1: %d", curr->state);
         job_checkupdate(curr, s, curr->state, false);
         INFO("Read2: %d", curr->state);
-        job_print(curr, fss.out);
+        if (curr->priority == second)   priority = '-';
+        if (curr->priority >= hightest) priority = '+';
+        job_print(curr, fss.out, priority);
         curr = curr->next; 
     } while (curr != NULL);
+
     return 0;
     
 }
+
+static char** expand_job_args(int c, char** v, struct file_streams fss, _out_ int* err) {
+    char **ret;
+    int id;
+    pid_t pid = -1;
+    *err = 0;
+
+    ret = malloc(sizeof(char*) * (c + 1));
+    for(int i = 0; i < c; i++) {
+        // Sera suficiente espacio.
+        ret[i] = malloc(strlen(v[i]) + 5);
+        if (v[i][0] == '%') {
+            id = atoi(v[i] + 1);
+            if((pid = job_get_pid(id)) == -1) {
+                MSH_ERR_C("'%s' no such job", v[i]);
+                *err = 1;
+            }
+            sprintf(ret[i], "%d", pid);
+            continue;
+        } strcpy(ret[i], v[i]);
+    }
+    ret[c] = NULL;
+    return ret;
+}
+
+static void free_argv(int c, char**v) {
+    for (int i = 0; i < c; i++)
+    {
+        free(v[i]);
+    }if(v)free(v);  
+}
+/**
+ * Sobreescritura del comando externo kill.
+ */
+int builtin_kill         (int c, char** v, struct file_streams fss) {
+    (void)c; (void)v; (void)fss;
+    char** exp_args;
+    int err = 0;
+    pid_t pid = 0;
+    int status = 0;
+
+    g_dont_nl = 1;
+    exp_args = expand_job_args(c, v, fss, &err);
+    if(!exp_args) return 127;
+    if (err) {
+        if (exp_args)free_argv(c, exp_args);
+        return 1;
+    }
+
+    // Llamar al comando externo /usr/bin/kill
+    pid = fork();
+    if (!pid) {
+        // Proceso hijo
+        signal(SIGTTOU, SIG_IGN);
+        signal(SIGTTIN, SIG_IGN);
+        signal(SIGTSTP, SIG_DFL);
+        dup2(fileno(fss.in), STDIN_FILENO);
+        dup2(fileno(fss.out), STDOUT_FILENO);
+        dup2(fileno(fss.err), STDERR_FILENO);
+        setpgid(0, 0);
+        execve("/usr/bin/kill", exp_args, environ);
+        perror("execve->kill");
+        free_argv(c, exp_args);
+        exit(1);
+    }
+    //proceso padre
+    waitpid(pid, &status, 0);
+    free_argv(c, exp_args);
+    g_dont_nl = 0;
+    return WIFEXITED(status)? WEXITSTATUS(status) : 1;
+    
+}
+
 int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
 
 

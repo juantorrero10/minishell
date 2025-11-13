@@ -30,6 +30,7 @@ int builtin_whaterror   (int, char**, struct file_streams);
 int builtin_fg          (int, char**, struct file_streams);
 int builtin_set         (int, char**, struct file_streams);
 int builtin_unset       (int, char**, struct file_streams);
+int builtin_kill         (int, char**, struct file_streams);
 
 
 
