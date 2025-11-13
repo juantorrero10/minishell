@@ -17,6 +17,7 @@
 #include <stdbool.h>
 #include <errno.h>    
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <ctype.h>
 
 #include <parser.h>

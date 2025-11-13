@@ -27,11 +27,10 @@ builtin_t g_builtin_function_table[] = {
         {"umask", builtin_umask},
         {"jobs", builtin_jobs},
         {"fg", builtin_fg},
-        {"werror", builtin_whaterror},
         {"set", builtin_set},
         {"unset", builtin_unset},
-        {"whaterror", builtin_whaterror},
         {"kill", builtin_kill}, // Sobreescrito.
+        {"getpid", builtin_getpid},
         {NULL, NULL}
     };
 

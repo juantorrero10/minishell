@@ -83,22 +83,14 @@ job_t* job_get(pid_t pgid) {
 
     if (g_bgjob_list == NULL) return r;
     c = g_bgjob_list;
-    for (int i = 0; i < c->nprocceses; i++)
-    {
-        if (c->pids[i] == pgid) {
-            return c;
-        }
-    }
-    
-    while(c->next != NULL) {
-        c = c->next;
+    do {
         for (int i = 0; i < c->nprocceses; i++)
         {
-            if (c->pids[i] == pgid) {
-                return c;
-            }
+            if (c->pids[i] == pgid)return c;
         }
-    }
+        c = c->next;
+        
+    } while (c);
     return r;
 }
 
@@ -194,7 +186,7 @@ job_state job_get_status(pid_t pgid) {
         return STOPPED;
     default:
         job = job_get(pgid);
-        job->priority = 0;
+        if (job)job->priority = 0;
         return DONE;
     }
 }
@@ -217,6 +209,7 @@ void job_update_status() {
     do {
         cs = job_get_status(curr->pgid);
         job_checkupdate(curr, cs, curr->state, true);
+        INFO("job_checkupdate: %d -> %d", curr->state, cs);
         curr = curr->next;
     } while(curr);
 }

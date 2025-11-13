@@ -24,7 +24,7 @@ BIN=$(BIN_DIR)/$(TARGET)
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
 
 ifdef DEBUG
-CCFLAGS += -D__DEBUG
+CCFLAGS += -D__DEBUG -fsanitize=address,undefined
 endif
 
 

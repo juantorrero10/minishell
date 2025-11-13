@@ -2,9 +2,9 @@
 #include <log.h>
 
 static void close_file_streams(struct file_streams streams) {
-    (streams.out == stdout)? fflush(stdout) : fclose(streams.out);
-    (streams.in == stdin)  ? fflush(stdin)  : fclose(streams.in);
-    (streams.err == stderr)? fflush(stderr) : fclose(streams.err);
+    if (streams.out != stdout) fclose(streams.out); else fflush(stdout);
+    if (streams.in != stdin) fclose(streams.in); /* do not fflush(stdin) */
+    if (streams.err != stderr) fclose(streams.err); else fflush(stderr);
 }
 
 
@@ -100,12 +100,12 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
 
 
         //Ejecutar comando
-        setpgid(pid, job->pgid);
+        setpgid(0, 0);
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
         perror(tokens->commands[i].filename);
         // Terminar ejecuccion del proceso hijo.
-        exit(1);
+        _exit(127);
 
     } else {
         /*--------------------- PROCESO PADRE ---------------------*/
@@ -148,7 +148,15 @@ int execute_command(tline* tokens, const char* cmdline) {
     job_t job = {.nprocceses = tokens->ncommands, 
         .background = tokens->background, .pids = NULL};
     // -----------------------------------------------------------
+
+    if (!tokens->ncommands) return 0;
+
     job.pids = malloc(sizeof(pid_t) * job.nprocceses);
+    for (int i = 0; i < tokens->ncommands; i++)
+    {
+        job.pids[i] = -1;
+    }
+    
     job.cmdline = malloc(strlen(cmdline) + 1);
     strcpy(job.cmdline, cmdline);
 
@@ -216,6 +224,7 @@ int execute_command(tline* tokens, const char* cmdline) {
         tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
+            if (job.pids[i] == -1) continue;
             waitpid(job.pids[i], &status, WUNTRACED);
             INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
             if (WIFSTOPPED(status)) {

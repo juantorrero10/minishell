@@ -13,7 +13,7 @@
 int builtin_exit (int c, char** v, struct file_streams fss){
     int code = 0;
     char response[3];
-    job_t* curr;
+    job_t* curr, *next;
 
     // Ignorar redirecciones.
     fss = (struct file_streams){ .out = stdout, .in = stdin, .err = stderr };
@@ -31,16 +31,19 @@ int builtin_exit (int c, char** v, struct file_streams fss){
     }
     // Eliminar trabajos terminados y comprobar si quedan trabajos activos.
     if (g_sz_jobs) {
+
         curr = g_bgjob_list;
         do {
+            next = curr->next;
             if (curr->state == DONE)job_rm(curr->pgid);
-            curr = curr->next;
+            curr = next;
         } while(curr);
+
         if (g_sz_jobs == 0) {
             g_exit_signal = 1;
             return code;
         }
-        MSH_ERR_C("there's still %zu jobs active, ", g_sz_jobs);
+        MSH_ERR_C("there are still %zu job/s active, ", g_sz_jobs);
         fprintf(fss.out, "Terminate all jobs and exit? (y/n): ");
         fgets(response, 3, stdin);
         if (!strchr(response, 'y') && !strchr(response, 'Y')) {
@@ -132,7 +135,44 @@ int builtin_unset(int c, char** v, struct file_streams fss) {
     return 0;
 }
 
-int builtin_umask(int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; return 0L;}
+int builtin_umask(int c, char** v, struct file_streams fss){
+    mode_t mask;
+
+    if (c > 2) {
+        MSH_ERR_C("umask: too many arguments");
+        return 1;
+    }
+    if (c == 2) {
+        if (!strcmp("--help", v[1])) {
+            MSH_LOG_C("umask: Usage: %s [mask]", v[0]);
+            return 0;
+        }
+        // Comprobar si todos son dígitos del 0 al 7.
+        for (size_t i = 0; i < strlen(v[1]); i++)
+        {
+            if (v[1][i] < '0' || v[1][i] > '7') {
+                MSH_ERR_C("umask: invalid mask '%s'", v[1]);
+                return 1;
+            }
+        }
+        
+        mask = strtol(v[1], NULL, 8);
+        if (mask > 511) {   //0777 en decimal
+            MSH_ERR_C("umask: invalid mask '%s'", v[1]);
+            return 1;
+        }
+        umask(mask);
+        return 0;
+    }
+    // Mostrar la máscara actual.
+    mask = umask(0);
+    umask(mask);
+    COLOR_BRIGHT_GREEN(fss.out);
+    fprintf(fss.out, "0%03o\n", mask);
+    COLOR_RESET(fss.out);
+
+    return 0L;
+}
 
 int builtin_jobs (int c, char** v, struct file_streams fss){ 
     (void)c; (void)v;
@@ -346,27 +386,10 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
 }
 
-
-int builtin_whaterror(int c, char** v, struct file_streams fss) {
-    int error = g_last_error_code;
-    char* s = NULL;
-
-    if (c > 2) {
-        MSH_ERR_C("whaterror: too many arguments");
-        return 1;
-    } else if (c == 2) {
-        error = atoi(v[1]);
-    }
-    
-    switch (error) {
-        case EXIT_COMMAND_NOT_FOUND: s = "EXIT_COMMAND_NOT_FOUND";break;
-        case EXIT_ERROR_FORKING: s = "EXIT_ERROR_FORKING";break;
-        case EXIT_ERROR_OPENING_FILE: s = "EXIT_ERROR_OPENING_FILE";break;
-        case EXIT_ERROR_CREATING_PIPE: s = "EXIT_ERROR_CREATING_PIPE";break;
-        case EXIT_FAILURE: s = "EXIT_FAILURE";break;
-        case EXIT_SUCCESS: s = "EXIT_SUCCESS"; break;
-        default: s = "unknown";
-    }
-    MSH_LOG_C("%d: %s", error, s);
-    return error;
+int builtin_getpid(int c, char** v, struct file_streams fss){
+    (void)c; (void)v;
+    COLOR_GREEN(fss.out);
+    fprintf(fss.out, "%d", getpid());
+    COLOR_RESET(fss.out); fputc('\n', fss.out);
+    return 0;
 }

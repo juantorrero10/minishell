@@ -23,12 +23,13 @@ char* env_get_var(
 char* env_expand_vars(const char* fmt, size_t* length) {
     size_t idx = 0, out_len = 0, start = 0;
     size_t alloc_size = 1;
-    char* output = calloc(1, alloc_size);
+    char* output = malloc(1);
     bool paren = false;
     char varname[MAX_VARNAME_COPY];
 
-    if (!fmt) return NULL;
+
     if (!output) return NULL;
+    if (!fmt) {free(output); return NULL;}
     while (fmt[idx]) {
         if (fmt[idx] == '$') {
             idx++;
@@ -92,11 +93,12 @@ char* env_expand_vars(const char* fmt, size_t* length) {
 
 
 tline* env_expand_wholeline(const tline* og) {
-    tline* new = (tline*) malloc(sizeof(tline));
+    tline* new = NULL;
     size_t sz = 0;
     tcommand c = {0};
     char* tmp = NULL;
 
+    new = (tline*) malloc(sizeof(tline));
     // Copiar los contenidos "estaticos"
     new->ncommands = og->ncommands;
     new->background = og->background;
@@ -117,7 +119,7 @@ tline* env_expand_wholeline(const tline* og) {
         new->commands[i].filename = NULL;
         new->commands[i].argv = NULL;
         if (og->commands[i].filename) {
-            new->commands[i].filename = malloc(strlen(og->commands[i].filename));
+            new->commands[i].filename = malloc(strlen(og->commands[i].filename) + 1);
             strcpy(new->commands[i].filename, og->commands[i].filename);
         }
 
@@ -140,6 +142,7 @@ tline* env_expand_wholeline(const tline* og) {
             
             c.argv[j] = malloc(sz + 1);
             memcpy(c.argv[j], tmp, sz + 1);
+            free(tmp);
         }
         // Añadir la string nula
         c.argv[og->commands[i].argc] = NULL;
