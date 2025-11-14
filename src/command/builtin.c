@@ -8,26 +8,40 @@
 
 
 /**
- *  exit [code]
+ *  exit [code] [-f]
  */
 int builtin_exit (int c, char** v, struct file_streams fss){
     int code = 0;
     char response[3];
     job_t* curr, *next;
+    bool force_exit = false;
 
     // Ignorar redirecciones.
     fss = (struct file_streams){ .out = stdout, .in = stdin, .err = stderr };
 
-    if (c > 2) {
+    if (c > 3) {
         MSH_ERR_C("exit: too many arguments");
         return 1;
     }
     if (c == 2) {
         if (!strcmp("--help", v[1])) {
-            MSH_LOG_C("exit: Usage: %s [code]", v[0]);
+            MSH_LOG_C("exit: Usage: %s [code] [-f]", v[0]);
             return code;
+        } if (!strcmp("-f", v[1])) {
+            force_exit = true;
+            code = 0;
+        } else code = atoi(v[1]);
+    } else if (c == 3) {
+        if (!strcmp("-f", v[2])) {
+            code = atoi(v[1]);
+            force_exit = true;
+        } else if (!strcmp("-f", v[1])) {
+            code = atoi(v[2]);
+            force_exit = true;
+        } else {
+            MSH_LOG_C("exit: Usage: %s [code] [-f]", v[0]);
+            return 1;
         }
-        code = atoi(v[1]);
     }
     // Eliminar trabajos terminados y comprobar si quedan trabajos activos.
     if (g_sz_jobs) {
@@ -43,13 +57,15 @@ int builtin_exit (int c, char** v, struct file_streams fss){
             g_exit_signal = 1;
             return code;
         }
-        MSH_ERR_C("there are still %zu job/s active, ", g_sz_jobs);
-        fprintf(fss.out, "Terminate all jobs and exit? (y/n): ");
-        fgets(response, 3, stdin);
-        if (!strchr(response, 'y') && !strchr(response, 'Y')) {
-            g_exit_signal = 2;
-            fflush(stdout);
-            return 1;
+        if (!force_exit) {
+            MSH_ERR_C("there are still %zu job/s active, ", g_sz_jobs);
+            fprintf(fss.out, "Terminate all jobs and exit? (y/n): ");
+            fgets(response, 3, stdin);
+            if (!strchr(response, 'y') && !strchr(response, 'Y')) {
+                g_exit_signal = 2;
+                fflush(stdout);
+                return 1;
+            }
         }
         g_dont_nl = 1;
         curr = g_bgjob_list;
@@ -184,7 +200,11 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
     hightest = -1;
     second = -1;
     if (c > 1 && !strcmp(v[1], "--help")) {
-        MSH_LOG_C("jobs: todo-> help message");
+        MSH_LOG_C("jobs: print all curent jobs.\nformat:");
+        fprintf(fss.out, " [id]p State\t\t'command'\t{pid}\n");
+        fprintf(fss.out, "-----------------------------------------------------\n");
+        fprintf(fss.out, " p (priority) \t-> '+', '-', ' '\n");
+        fprintf(fss.out, " State \t\t-> Running, Stopped, Done\n");
         return 0;
     }
 
@@ -304,7 +324,6 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     pid_t pid = 0;
     job_t* job;
     int status;
-    job_llist t = g_bgjob_list; (void)t;
     bool need_free = 0;
 
     if (c > 2) {

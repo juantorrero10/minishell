@@ -145,7 +145,7 @@ void job_print(job_t* j, FILE* stream, char priority){
     
     str_state(j->state, buff);
     if(j->state == DONE) priority = ' ';
-    fprintf(stream, "[%d]%c  %s\t\t%s\t{%d}\n", j->id, priority, buff, j->cmdline, j->pgid);
+    fprintf(stream, "[%d]%c %s\t\t%s\t{%d}\n", j->id, priority, buff, j->cmdline, j->pgid);
     if (j->state >= 10) {
         job_rm(j->pgid);
     }

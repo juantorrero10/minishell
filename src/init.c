@@ -99,5 +99,5 @@ void init_minishell(int argc, char** argv) {
     printf("%s", banner);
 #endif
     INFO("TERMINAL PID: %d", getpid());
-    INFO("DEBUG MODE");
+    WARN("DEBUG MODE");
 }

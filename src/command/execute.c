@@ -33,7 +33,6 @@ static int find_builtin(char* c) {
     return EXIT_COMMAND_NOT_FOUND;
 }
 #ifdef __DEBUG
-/*
 static void print_command(tline* tokens) {
     int __i = 0;
     int __j = 0;
@@ -52,7 +51,6 @@ static void print_command(tline* tokens) {
     INFO(">&: %s", tokens->redirect_error);
     // cd $(PWD)/src > $(HOME)/out.txt
 }
-*/
 #endif
 
 static int launch_external(int i, tline *tokens, struct file_streams fss, job_t* job, int* pipe_fd, int* prev_pipe) {
@@ -150,6 +148,9 @@ int execute_command(tline* tokens, const char* cmdline) {
     // -----------------------------------------------------------
 
     if (!tokens->ncommands) return 0;
+    #ifdef __DEBUG
+    print_command(tokens);
+    #endif
 
     job.pids = malloc(sizeof(pid_t) * job.nprocceses);
     for (int i = 0; i < tokens->ncommands; i++)

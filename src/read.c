@@ -22,7 +22,81 @@ void free_tokens(tline* t) {
     }free(t->commands);
 }
 
-int read_line_input(char* buff, size_t max) {
+/**
+ * @brief Junta argumentos con entre comillas.
+ * Es necesario que se ejecute despues de la expansión de variables.
+ */
+static void join_quoted_arguments(tline* line) {
+    size_t len_curr = 0;
+    size_t bufflen_new = 0;
+    char* buff;
+    char* ptr;
+    int argc;
+    int new_idx = 0;
+    int k = 0;
+
+    // Iterar en cada comando
+    for (int i = 0; i < line->ncommands; i++)
+    {
+        argc = line->commands[i].argc;
+        new_idx = 0;
+        // Iterar en cada argumento
+        for (int j = 0; j < line->commands[i].argc; j++)
+        {
+            bufflen_new = 0;
+            buff = NULL;
+            if (line->commands[i].argv[j][0] == '\"') {
+                k = j;
+                //Saltar hasta el commando con el cierre de commillas.
+                while (line->commands[i].argv[j][strlen(line->commands[i].argv[j]) - 1] != '\"' 
+                    && j < line->commands[i].argc) {
+                    j++;
+                }
+                // Unir los argumentos k, ..., j
+                for (int l = 0; l < (j - k + 1); l++)
+                {
+                    bufflen_new += strlen(line->commands[i].argv[k + l]) + 1;
+                }
+                // Quitar las comillas.
+                bufflen_new -= 2;
+                buff = malloc(bufflen_new + 1);
+                buff[0] = '\0';
+                for (int l = 0; l < (j - k + 1); l++)
+                {
+                    ptr = line->commands[i].argv[k + l];
+                    len_curr = strlen(ptr);
+                    // Si es el último no copiar " del final
+                    if(l == (j - k)) len_curr--;
+                    // Si es el primero saltar " del inicio
+                    if (l == 0) {ptr++; len_curr--;}
+                    // Añadir espacio.
+                    if (l != 0) {
+                        strcat(buff, " ");
+                    }
+                    strncat(buff, ptr, len_curr);
+                    free(line->commands[i].argv[k + l]);
+                }
+                // Restar al numero de argumentos
+                buff[bufflen_new] = '\0';
+                argc -= (j - k);
+                
+            }
+            if (buff)line->commands[i].argv[new_idx] = buff;
+            new_idx++;
+        }
+        // Eliminar argumentos sobrantes
+        for (int j = 0; j < (line->commands[i].argc - argc); j++)
+        {
+            line->commands[i].argv[new_idx + j] = NULL;
+        }
+        
+        line->commands[i].argc = argc;
+        
+    }
+    
+}
+
+int read_line_input(char* buff, size_t max, bool print_prompt) {
     size_t buff_len = 0;
     size_t remaining = 0;
     size_t total = 0;
@@ -33,7 +107,7 @@ int read_line_input(char* buff, size_t max) {
     int ret = 0;
 
     // Imprimir el "prompt"
-    PROMPT_PRINT();
+    if (print_prompt) {PROMPT_PRINT();}
     fgets(buff, max, stdin);
 
     /** Si hay un caracter '\n' al final significa que el usuario 
@@ -45,16 +119,19 @@ int read_line_input(char* buff, size_t max) {
 
     buff_len = strlen(buff);
     remaining= INPUT_LINE_MAX - (buff_len + 1);
-    if (buff[buff_len - 1] == '\n') {
+    if (buff[buff_len - 1] == '\n' && buff[0] != '#') {
         buff[buff_len - 1] = '\0';
         buff_len--;
         total = buff_len;
         remaining++;
+        
         // Permitir varias lineas con '\'
         while (buff[total - 1] == '\\' && remaining > 0) {
-            COLOR_GREY(stdout);
-            fprintf(stdout, ">\t\t\t\t");
-            COLOR_RESET(stdout);
+            if (print_prompt) {
+                COLOR_GREY(stdout);
+                fprintf(stdout, ">\t\t\t\t");
+                COLOR_RESET(stdout);
+            }
             // Eliminar la barra invertida
             buff[total - 1] = '\0';
             buff_len--; total--; remaining++;
@@ -78,7 +155,9 @@ int read_line_input(char* buff, size_t max) {
         line = tokenize(buff);
         if (line != NULL) {
             expanded = env_expand_wholeline(line);
+            join_quoted_arguments(expanded);
             ret = execute_command(expanded, buff);
+            
             // Actualizar el último codigo de error.
             g_last_error_code = ret;
 

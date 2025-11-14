@@ -24,9 +24,12 @@ BIN=$(BIN_DIR)/$(TARGET)
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
 
 ifdef DEBUG
-CCFLAGS += -D__DEBUG -fsanitize=address,undefined
+CCFLAGS += -D__DEBUG
 endif
 
+ifdef ASAN
+CCFLAGS += -fsanitize=address,undefined
+endif
 
 # --------------- COLORS -------------------------
 WHITE  = \033[0;39m
