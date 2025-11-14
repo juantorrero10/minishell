@@ -5,5 +5,4 @@
 
 int read_line_input(char* buff, size_t max);
 void free_tokens(tline* t);
-
 #endif // READ_H_

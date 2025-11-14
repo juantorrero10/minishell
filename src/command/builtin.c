@@ -335,7 +335,7 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
     if (!job) {
         if (need_free)free_argv(c, exp_args);
-        if(exp_args && need_free) free(exp_args);
+        //if(exp_args && need_free) free(exp_args);
         return -1;
     }
 
