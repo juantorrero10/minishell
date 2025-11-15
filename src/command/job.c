@@ -233,7 +233,7 @@ void job_checkupdate(job_t* j, job_state new, job_state old, bool notify) {
     if (new == old) return;
     j->state = new;
     if (new == STOPPED && old == RUNNING && notify) {
-        MSH_LOG("Job [%d] '%s' stopped\t{%d}", j->id, j->cmdline, j->pgid);
+        MSH_LOG("Trabajo [%d] '%s' detenido.\t{%d}", j->id, j->cmdline, j->pgid);
     }
 }
 

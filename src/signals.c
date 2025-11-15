@@ -49,7 +49,7 @@ void sigchld_handler(int sig) {
 
         if (all_done) {
             if (!g_dont_nl)printf("\n");
-            MSH_LOG("job [%d] '%s' done\t{%d}", j->id, j->cmdline, j->pgid);
+            MSH_LOG("Trabajo [%d] '%s' finalizó\t{%d}", j->id, j->cmdline, j->pgid);
             INFO("DONE: %d", DONE);
             j->state = DONE;
         }

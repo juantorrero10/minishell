@@ -22,7 +22,6 @@ static void close_file_streams(struct file_streams streams) {
 static int launch_builtin(int idx, int argc, char** argv, struct file_streams streams) {
     int ret = 0;
     if (idx == EXIT_COMMAND_NOT_FOUND){
-        MSH_ERR("%s: no se encuentra el mandato", argv[0]);
         return idx;
     }
     ret = g_builtin_function_table[idx].fptr(argc, argv, streams);
@@ -213,7 +212,7 @@ int execute_command(tline* tokens, const char* cmdline) {
         if (i == 0 && tokens->redirect_input) {
             fss.in= fopen(tokens->redirect_input, "r");
             if (!fss.in) {
-                MSH_ERR("%s: %s", tokens->redirect_input, strerror(errno));
+                MSH_ERR("%s: error: %s", tokens->redirect_input, strerror(errno));
                 ret = EXIT_ERROR_OPENING_FILE; break;
             }
         }
@@ -223,14 +222,14 @@ int execute_command(tline* tokens, const char* cmdline) {
             if (tokens->redirect_output) {
                 fss.out = fopen(tokens->redirect_output, "a+");
                 if (!fss.out) {
-                    MSH_ERR("%s: %s", tokens->redirect_output, strerror(errno));
+                    MSH_ERR("%s: error: %s", tokens->redirect_output, strerror(errno));
                     ret = EXIT_ERROR_OPENING_FILE; break;
                 }
             }
             if (tokens->redirect_error) {
                 fss.err = fopen(tokens->redirect_error, "a+");
                 if (!fss.err) {
-                    MSH_ERR("%s: %s", tokens->redirect_error, strerror(errno));
+                    MSH_ERR("%s: error: %s", tokens->redirect_error, strerror(errno));
                     ret = EXIT_ERROR_OPENING_FILE; break;
                 }
             }
@@ -242,7 +241,7 @@ int execute_command(tline* tokens, const char* cmdline) {
             last_internal = 1;
             builtin_idx = find_builtin(tokens->commands[i].argv[0]);
             if (builtin_idx == EXIT_COMMAND_NOT_FOUND) {
-                MSH_ERR("%s: command not found", tokens->commands[i].argv[0]);
+                MSH_ERR("%s: no se encontró el mandato", tokens->commands[i].argv[0]);
                 ret = EXIT_COMMAND_NOT_FOUND; break;
             }
             ret = launch_builtin(builtin_idx, 
@@ -267,7 +266,7 @@ int execute_command(tline* tokens, const char* cmdline) {
                 job.background = 1;
                 job.id = job_add(job);  // Añadir trabajo a la lista
                 fputc('\n', stdout);
-                MSH_LOG("new job: [%d] %d (Stopped)", job.id, job.pgid);
+                MSH_LOG("nuevo trabajo: [%d] %d (Detenido)", job.id, job.pgid);
                 ret = 0;
                 not_interrupted = 1;
                 signal(SIGTSTP, sigtstp_handle);
@@ -284,10 +283,10 @@ int execute_command(tline* tokens, const char* cmdline) {
         if (job.pgid) {
             job.id = job_add(job);
         } else if (!job.pgid) {
-            MSH_ERR_C("couldn't create '%s' job", cmdline);
+            MSH_ERR_C("%s: no se pudo crear el trabajo", cmdline);
             return EXIT_ERROR_CREATING_JOB;
         }
-        MSH_LOG("new job: [%d] %d", job.id, job.pgid);
+        MSH_LOG("nuevo trabajo: [%d] %d", job.id, job.pgid);
     }
 
     // Actualizar el estado de los trabajos.
