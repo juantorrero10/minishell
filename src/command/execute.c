@@ -5,9 +5,9 @@
  * @brief Cerrar los streams de archivos usados para redirecciones.
  */
 static void close_file_streams(struct file_streams streams) {
-    if (streams.out != stdout) fclose(streams.out); else fflush(stdout);
-    if (streams.in != stdin) fclose(streams.in); // no flush de stdin   
-    if (streams.err != stderr) fclose(streams.err); else fflush(stderr);
+    if (streams.out != stdout && streams.out) fclose(streams.out); else fflush(stdout);
+    if (streams.in != stdin   && streams.in)  fclose(streams.in); // no flush de stdin   
+    if (streams.err != stderr && streams.err) fclose(streams.err); else fflush(stderr);
 }
 
 
