@@ -1,12 +1,15 @@
 #include <minishell.h>
 #include <log.h>
 /**
- * @brief Handler de la SIGINT que no hace nada relevante.
+ * @brief Handler de SIGINT (Ctrl + C) que no hace nada relevante.
  */
 void sigint_handler(int sig) {
     (void)sig; fflush(stdout);
 }
 
+/**
+ * @brief Handler de SIGTSTP (Ctrl + Z) que tampoco hace nada.
+ */
 void sigtstp_handle(int sig) {
     WARN("SIGTSTP");
     (void)sig; fflush(stdout);
@@ -15,6 +18,10 @@ void sigtstp_handle(int sig) {
     signal(SIGTSTP, sigtstp_handle);
 }
 
+/**
+ * @brief Handler de SIGCHLD (creación de un proceso hijo) con fork();
+ * Marca los trabajos como DONE cuando todos sus procesos hijos han terminado.
+ */
 void sigchld_handler(int sig) {
     pid_t pid;
     int status;

@@ -24,6 +24,7 @@ void free_tokens(tline* t) {
 
 /**
  * @brief Junta argumentos con entre comillas.
+ * @param line Linea de comandos tokenizada.
  * Es necesario que se ejecute despues de la expansión de variables.
  */
 static void join_quoted_arguments(tline* line) {
@@ -113,12 +114,13 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     /** Si hay un caracter '\n' al final significa que el usuario 
     *   ha querido ejecutar este commando.
     * 
-    *   Si no lo hay se puede haber producido un SIGINT y se debe 
-    *   descartar lo que hay escrito.
+    *   Si no lo hay se puede haber producido un SIGINT o SIGTSTP y se 
+    *   descarta lo que hay escrito.
     */
 
     buff_len = strlen(buff);
     remaining= INPUT_LINE_MAX - (buff_len + 1);
+    // Ignorar lineas que no acaban en '\n' o que empiezan con '#' (comentarios)
     if (buff[buff_len - 1] == '\n' && buff[0] != '#') {
         buff[buff_len - 1] = '\0';
         buff_len--;
@@ -152,21 +154,31 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
             }
         }
 
+        // tokenizar
         line = tokenize(buff);
         if (line != NULL) {
+
+            // expandir variables de entorno y juntar argumentos entre comillas
             expanded = env_expand_wholeline(line);
             join_quoted_arguments(expanded);
+
+            // ejecutar commando.
             ret = execute_command(expanded, buff);
             
-            // Actualizar el último codigo de error.
+            // Actualizar el último codigo de error. $STATUS
             g_last_error_code = ret;
+            sprintf(buff, "%d", ret);
+            setenv("STATUS", buff, 1);
 
             free_tokens(expanded);
             free(expanded);
+
+            // señal de salida = 1 -> salir de la shell con código ret.
             if (g_exit_signal == 1) {
                 INFO("exit signal=1");
                 exit(ret);
             }
+            // señal de salida = 2 -> se ha cancelado el diálogo de salida.
             if (g_exit_signal == 2) {
                 fputc('\n', stdout);
                 g_exit_signal = 0;

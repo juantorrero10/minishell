@@ -1,15 +1,23 @@
 #include <minishell.h>
 #include <log.h>
 
+/**
+ * @brief Cerrar los streams de archivos usados para redirecciones.
+ */
 static void close_file_streams(struct file_streams streams) {
     if (streams.out != stdout) fclose(streams.out); else fflush(stdout);
-    if (streams.in != stdin) fclose(streams.in); /* do not fflush(stdin) */
+    if (streams.in != stdin) fclose(streams.in); // no flush de stdin   
     if (streams.err != stderr) fclose(streams.err); else fflush(stderr);
 }
 
 
 /**
  * @brief Ejecutar un comando interno.
+ * @param idx índice del comando en la tabla de builtins.
+ * @param argc número de argumentos.
+ * @param argv argumentos.
+ * @param streams redirecciones de entrada/salida/error.
+ * @return int código de error.
  */
 static int launch_builtin(int idx, int argc, char** argv, struct file_streams streams) {
     int ret = 0;
@@ -21,6 +29,9 @@ static int launch_builtin(int idx, int argc, char** argv, struct file_streams st
     return ret; 
 }
 
+/**
+ * @brief Encontrar el indice en tabla de commandos internos.
+ */
 static int find_builtin(char* c) {
     size_t i = 0;
 
@@ -53,12 +64,22 @@ static void print_command(tline* tokens) {
 }
 #endif
 
+/**
+ * @brief Lanzar un comando externo.
+ * @param i índice del comando dentro de los tokens.
+ * @param tokens tokens del commando.
+ * @param fss redirecciones (o no) de entrada/salida/error.
+ * @param job desctiptor del trabajo.
+ * @param pipe_fd array con los descriptores del pipe actual.
+ * @param prev_pipe descriptor del pipe anterior.
+ * @return int código de error.
+ */
 static int launch_external(int i, tline *tokens, struct file_streams fss, job_t* job, int* pipe_fd, int* prev_pipe) {
     pid_t pid = 0;
     int n = 0;
     
     n = tokens->ncommands;
-    // Si no es el último
+    // Si no es el último crear un pipe.
     if ( i < (n - 1)) {
         if (pipe(pipe_fd) == -1) {
             MSH_ERR("error creating pipe");
@@ -66,6 +87,9 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
             return EXIT_ERROR_CREATING_PIPE;
         }
     }
+    // Hacer un fork.
+    // Proceso hijo: ejecutar command.
+    // Proceso padre: guardar PID, gestionar pipes.
     pid = fork();
     if (pid == -1) {
         MSH_ERR("fork of '%s' failed", tokens->commands[i].argv[0]);
@@ -101,6 +125,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
         setpgid(0, 0);
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
+        // Si ha ocurrido un error.
         perror(tokens->commands[i].filename);
         // Terminar ejecuccion del proceso hijo.
         _exit(127);
@@ -108,7 +133,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
     } else {
         /*--------------------- PROCESO PADRE ---------------------*/
         job->pids[i] = pid;
-        if (i == 0) job->pgid = pid;
+        if (i == 0) job->pgid = pid; // el pgid es el pid del primer proceso.
         setpgid(pid, job->pgid);
 
         // Si no es el primero, cerrar la anterior
@@ -123,7 +148,10 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
 }
 
 /**
- * @brief ejecutar una serie de commandos.
+ * @brief "Funcion principal" del programa, ejecuta una serie de commandos.
+ * @param tokens tokens del commando.
+ * @param cmdline texto original del commando.
+ * @return int código de error.
  */
 int execute_command(tline* tokens, const char* cmdline) {
     /** 
@@ -143,8 +171,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     int prev_pipe_fd = -1;
     bool last_internal = 0;
     bool not_interrupted = 0;
-    job_t job = {.nprocceses = tokens->ncommands, 
-        .background = tokens->background, .pids = NULL};
+    job_t job = {0};
     // -----------------------------------------------------------
 
     if (!tokens->ncommands) return 0;
@@ -152,20 +179,23 @@ int execute_command(tline* tokens, const char* cmdline) {
     print_command(tokens);
     #endif
 
+    // Crear el descriptor del trabajo.
+    job.nprocceses = tokens->ncommands; 
+    job.background = tokens->background; 
+    job.pids = NULL;
     job.pids = malloc(sizeof(pid_t) * job.nprocceses);
     for (int i = 0; i < tokens->ncommands; i++)
     {
         job.pids[i] = -1;
     }
     
-    job.cmdline = malloc(strlen(cmdline) + 1);
-    strcpy(job.cmdline, cmdline);
+    job.cmdline = strdup(cmdline);
 
     // Ignorar estas señales durante la ejecucion.
     signal(SIGTTOU, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
 
-    // Restablecer SIGSTOP
+    // Restablecer SIGSTSTP
     signal(SIGTSTP, SIG_DFL);
 
     // Determinar si es necesario sobreescribir
@@ -175,6 +205,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     }
     ret = 0;
 
+    // Bucle principal, iterar en cada comando.
     for (int i = 0; i < tokens->ncommands; i++)
     {
         last_internal = 0;
@@ -219,17 +250,19 @@ int execute_command(tline* tokens, const char* cmdline) {
         }
         
     };
-    /*_--------------------------- FINAL DEL BUCLE PRINCIPAL --------------------------------*/
+    /*_-------------- FINAL DEL BUCLE PRINCIPAL -----------------------*/
+    // Si es un trabajo en primer dar control de la terminal y esperarle.
     if (!tokens->background) {
         g_dont_nl = 1;
-        tcsetpgrp(STDIN_FILENO, job.pgid);
+        tcsetpgrp(STDIN_FILENO, job.pgid); // Dar control.
         for (int i = 0; i < tokens->ncommands; i++)
         {
             if (job.pids[i] == -1) continue;
             waitpid(job.pids[i], &status, WUNTRACED);
             INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
+            // Si se detiene el trabajo con CTRL+Z -> añadir a la lista de trabajos.
             if (WIFSTOPPED(status)) {
-                tcsetpgrp(STDIN_FILENO, getpid());
+                tcsetpgrp(STDIN_FILENO, getpid()); // devolver control.
                 job.state = STOPPED;
                 job.background = 1;
                 job.id = job_add(job);  // Añadir trabajo a la lista
@@ -241,7 +274,7 @@ int execute_command(tline* tokens, const char* cmdline) {
                 break;
             }
         }  if (!last_internal && !not_interrupted)ret = WEXITSTATUS(status);
-        tcsetpgrp(STDIN_FILENO, getpid());
+        tcsetpgrp(STDIN_FILENO, getpid()); // Quitar control.
         g_dont_nl = 0;
 
         
@@ -257,10 +290,14 @@ int execute_command(tline* tokens, const char* cmdline) {
         MSH_LOG("new job: [%d] %d", job.id, job.pgid);
     }
 
+    // Actualizar el estado de los trabajos.
     job_update_status();
+    // Cerrar los streams de archivos.
     close_file_streams(fss);
+    // Limpiar memoria.
     free(job.pids);
     free(job.cmdline);
+    // Restablecer señal
     signal(SIGTSTP, sigtstp_handle);
     INFO("END execute_command");
     return ret;

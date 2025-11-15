@@ -1,13 +1,18 @@
 #include <minishell.h>
 #include <log.h>
 
+/**
+ * @brief Añadir un nuevo trabajo a la lista con la prioridad mas alta.
+ * @param j trabajo a añadir.
+ * @return int ID del trabajo añadido.
+ */
 int job_add(job_t j) {
     job_t* new = malloc(sizeof(job_t));
     size_t sz = 0;
     job_t* curr, *prev;
     int highest = 0;
 
-    //----  copiar contenidos. ----
+    //----  copiar contenidos ----
     new->background = j.background;
     new->nprocceses = j.nprocceses;
     new->pgid = j.pgid;
@@ -16,9 +21,8 @@ int job_add(job_t j) {
     new->priority = 0;
     new->id = 1;
     
-    sz = strlen(j.cmdline) + 1;
-    new->cmdline = malloc(sz);
-    memcpy(new->cmdline, j.cmdline, sz);
+
+    new->cmdline = strdup(j.cmdline);
 
     sz = sizeof(pid_t) * j.nprocceses;
     new->pids = malloc(sz);
@@ -30,6 +34,7 @@ int job_add(job_t j) {
         g_sz_jobs++;
         return 1;
     }
+    // Añadir al final de la lista con prioridad mas alta.
     curr = g_bgjob_list;
     prev = NULL;
     do {
@@ -45,6 +50,7 @@ int job_add(job_t j) {
     return new->id;
 }
 
+// Liberar memoria de un objeto job.
 static void job_free(job_t* j) {
     if(!j) return;
     if(j->cmdline)free(j->cmdline);
@@ -52,6 +58,10 @@ static void job_free(job_t* j) {
     free(j);
 }
 
+/**
+ * @brief Eliminar el trabajo con el pgid especificado.
+ * @param pgid ID de grupo del trabajo a eliminar.
+ */
 void job_rm(pid_t pgid) {
     job_t* curr, *next;
     
@@ -77,6 +87,11 @@ void job_rm(pid_t pgid) {
     }
 }
 
+/**
+ * @brief Obtener el trabajo con el pgid especificado.
+ * @param pgid ID de grupo del trabajo a obtener.
+ * @return job_t* puntero al trabajo o NULL si no se encuentra.
+ */
 job_t* job_get(pid_t pgid) {
     job_t* r = NULL;
     job_t* c = NULL;
@@ -94,6 +109,10 @@ job_t* job_get(pid_t pgid) {
     return r;
 }
 
+/**
+ * @brief Obtener el trabajo con mayor prioridad.
+ * @return job_t* puntero al trabajo o NULL si no hay trabajos.
+ */
 job_t* job_get_plus() {
     job_t* curr = NULL;
     job_t* highest = NULL;
@@ -108,8 +127,11 @@ job_t* job_get_plus() {
     return highest;
 }
 
-int job_fg(pid_t pgid) {return pgid;}
-
+/**
+ * @brief Obtener el pgid del trabajo con el id especificado.
+ * @param id ID del trabajo.
+ * @return pid_t pgid del trabajo o -1 si no se encuentra.
+ */
 pid_t job_get_pid(int id) {
     job_t* curr;
     pid_t ret = -1;
@@ -123,12 +145,7 @@ pid_t job_get_pid(int id) {
     return ret;
 }
 
-int job_stop(pid_t pgid) {return pgid;}
-int job_resume(pid_t pgid) {return pgid;}
-int job_interrupt(pid_t pgid) {return pgid;}
-int job_kill(pid_t pgid){return pgid;}
-
-
+// Convertir estado a cadena para imprimir en pantalla.
 static void str_state(job_state s, char* buff) {
     switch (s)
     {
@@ -140,17 +157,30 @@ static void str_state(job_state s, char* buff) {
     }
 }
 
+/**
+ * @brief Imprimir un trabajo en un stream.
+ * @param j trabajo a imprimir.
+ * @param stream donde imprimir.
+ * @param priority caracter de prioridad ('+', '-', ' ').
+ * @note Al igual que en bash, los trabajos terminados se eliminan al imprimirlos.
+ */
 void job_print(job_t* j, FILE* stream, char priority){
     char buff[32];
     
     str_state(j->state, buff);
     if(j->state == DONE) priority = ' ';
     fprintf(stream, "[%d]%c %s\t\t%s\t{%d}\n", j->id, priority, buff, j->cmdline, j->pgid);
-    if (j->state >= 10) {
+    if (j->state == DONE) {
         job_rm(j->pgid);
     }
 }
 
+/**
+ * @brief Obtener el estado actual de un trabajo.
+ * @param pgid ID de grupo del trabajo.
+ * @return job_state estado del trabajo.
+ * @note se lee /proc/[pgid]/stat para obtener el estado y detectar cambios.
+ */
 job_state job_get_status(pid_t pgid) {
     FILE *f;
     char s[20];
@@ -191,6 +221,13 @@ job_state job_get_status(pid_t pgid) {
     }
 }
 
+/**
+ * @brief actualizar y notificar cambio de estado de un trabajo.
+ * @param j trabajo a actualizar.
+ * @param new nuevo estado.
+ * @param old estado anterior.
+ * @param notify si es true notificar el cambio de estado.
+ */
 void job_checkupdate(job_t* j, job_state new, job_state old, bool notify) {
     if ((int)new == -1) return;
     if (new == old) return;
@@ -200,6 +237,9 @@ void job_checkupdate(job_t* j, job_state new, job_state old, bool notify) {
     }
 }
 
+/**
+ * @brief Actualizar el estado de todos los trabajos en la lista.
+ */
 void job_update_status() {
     job_t* curr;
     job_state cs;

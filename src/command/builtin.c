@@ -9,6 +9,7 @@
 
 /**
  *  exit [code] [-f]
+ *  -f : force exit, terminar todos los trabajos sin preguntar.
  */
 int builtin_exit (int c, char** v, struct file_streams fss){
     int code = 0;
@@ -31,7 +32,9 @@ int builtin_exit (int c, char** v, struct file_streams fss){
             force_exit = true;
             code = 0;
         } else code = atoi(v[1]);
-    } else if (c == 3) {
+    } 
+    
+    else if (c == 3) {
         if (!strcmp("-f", v[2])) {
             code = atoi(v[1]);
             force_exit = true;
@@ -42,7 +45,8 @@ int builtin_exit (int c, char** v, struct file_streams fss){
             MSH_LOG_C("exit: Usage: %s [code] [-f]", v[0]);
             return 1;
         }
-    }
+    } // if c == 1 -> code = 0;
+
     // Eliminar trabajos terminados y comprobar si quedan trabajos activos.
     if (g_sz_jobs) {
 
@@ -151,6 +155,9 @@ int builtin_unset(int c, char** v, struct file_streams fss) {
     return 0;
 }
 
+/**
+ * umask [mask]
+ */
 int builtin_umask(int c, char** v, struct file_streams fss){
     mode_t mask;
 
@@ -244,6 +251,10 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
     
 }
 
+/*
+* @example [1]+ Running    'sleep 100'    {12345}
+*         > fg %1 ----> fg 12345
+*/
 static char** expand_job_args(int c, char** v, struct file_streams fss, _out_ int* err) {
     char **ret;
     int id;
@@ -318,6 +329,10 @@ int builtin_kill         (int c, char** v, struct file_streams fss) {
     
 }
 
+/**
+ * fg [%job_id]
+ * si no se especifica job_id, usar el de mayor prioridad marcado como '+' en jobs.
+ */
 int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (void)fss; 
     char** exp_args = NULL;
     int err = 0;
@@ -332,6 +347,10 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     }
     // fg %n -> fg {pid del trabajo n} 
     if (c == 2) {
+        if (!strcmp("--help", v[1])) {
+            MSH_LOG_C("fg: Usage: %s [%%job_id]", v[0]);
+            return 0;
+        }
         exp_args = expand_job_args(c, v, fss, &err);
         if(!exp_args) return 127;
         if (err) {
@@ -354,8 +373,13 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
     if (!job) {
         if (need_free)free_argv(c, exp_args);
-        //if(exp_args && need_free) free(exp_args);
+        MSH_ERR_C("fg: Could find job with pid {%d}", pid);
         return -1;
+    }
+    if (job->state == DONE) {
+        MSH_ERR_C("fg: job [%d] finished.", job->id);
+        if (need_free)free_argv(c, exp_args);
+        return -2;
     }
 
     // Si el trabajo esta parado, reanudarlo.

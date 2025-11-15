@@ -3,10 +3,8 @@
 
 #include <minishell.h>
 
-/*
-* DONE e INTERRUPT son distintos porque desaparecen una vez impresos.
-*/
-typedef enum {RUNNING=0, STOPPED, DONE=10}job_state;
+
+typedef enum {RUNNING=0, STOPPED, DONE}job_state;
 
 typedef struct _job_desc {
     pid_t *pids;          // PIDs de los procesos hijos.
@@ -27,43 +25,17 @@ extern job_llist g_bgjob_list;
 // Numero de trabajos en segundo plano.
 extern size_t g_sz_jobs;
 
-/**
- * @brief Inserta un trabajo al final de la lista
- * @returns id del nuevo trabajo.
- */
-int job_add(job_t j);
-
-/**
- * @brief Elimina el trabajo de la lista.
- */
-void job_rm(pid_t pgid);
-
-
-job_t* job_get(pid_t pgid);
-job_t* job_get_plus();
-
-pid_t job_get_pid(int id);
-
-/**
- * @brief lleva un trabajo al primer plano y lo elimina de la lista.
- */
-int job_fg(pid_t pgid);
-
-
-/**
- * @brief envia señales a los trabajos.
- */
-int job_stop(pid_t pgid);
-int job_resume(pid_t pgid);
-int job_interrupt(pid_t pid);
-int job_kill(pid_t pid);
-
-void job_print(job_t* j, FILE* stream, char priority);
-
-job_state job_get_status(pid_t pgid);
-pid_t job_get_pid(int id);
-void job_update_status();
-void job_checkupdate(job_t* j, job_state new, job_state old, bool notify);
+// Funciones para manejar trabajos en segundo plano.
+int         job_add             (job_t j);
+void        job_rm              (pid_t pgid);
+job_t*      job_get             (pid_t pgid);
+job_t*      job_get_plus        ();
+pid_t       job_get_pid         (int id);
+void        job_print           (job_t* j, FILE* stream, char priority);
+job_state   job_get_status      (pid_t pgid);
+pid_t       job_get_pid         (int id);
+void        job_update_status   ();
+void        job_checkupdate     (job_t* j, job_state new, job_state old, bool notify);
 
 
 

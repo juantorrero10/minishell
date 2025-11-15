@@ -1,5 +1,5 @@
 
-# -------------- DEFINITIONS -----------------
+# -------------- Deifiniciones -----------------
 TARGET = minishell
 CC = gcc
 DBG = gdb
@@ -10,10 +10,10 @@ OBJ_DIR=build/obj
 BIN_DIR=build/bin
 SRC_DIR=src
 
-# .c files are especified here
+# archivos .c fuente
 SRC = main.c read.c prompt.c init.c env.c signals.c command/execute.c command/builtin.c command/job.c
 
-# .a files inside ./$(LIB_DIR) no 'lib-' prefix nor '.a' extension
+# archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
 LIB = parser64
 
 LIB_FLAGS = $(addprefix -l, $(LIB))
@@ -23,38 +23,40 @@ BIN=$(BIN_DIR)/$(TARGET)
 
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
 
+# modo debug
 ifdef DEBUG
 CCFLAGS += -D__DEBUG
 endif
 
+# address sanitizer
 ifdef ASAN
 CCFLAGS += -fsanitize=address,undefined
 endif
 
-# --------------- COLORS -------------------------
+# --------------- COLORES -------------------------
 WHITE  = \033[0;39m
 GREEN  = \033[0;92m
 PURPLE = \033[0;95m
 CYAN   = \033[0;96m
 RED    = \033[0;91m
 
-# --------------- TASKS -------------------------
+# --------------- TAREAS -------------------------
 all:$(BIN)
 
-# Compile (*.c -> *.o)
+# Compilar (*.c -> *.o)
 $(OBJ_DIR)/%.o : $(SRC_DIR)/%.c | $(OBJ_DIR) $(OBJ_DIR)/command
 	@echo "$(PURPLE)--------------------------------------------------------------------------"
 	@echo "	Compiling: $(CYAN)$< $(PURPLE) -> $(RED) $@ $(WHITE)"
 	$(CC) $(CCFLAGS) -c $< -o $@
 
-# Linking (*.o -> binary)
+# Vincular (*.o -> binary)
 $(BIN) : $(OBJ) | $(BIN_DIR)
 	@echo "$(CYAN)--------------------------------------------------------------------------"
 	@echo "	Linking: $(RED)$< $(CYAN)-> $(GREEN)$@$(WHITE)"
 	$(CC) $(CCFLAGS) -o $@ $(OBJ) -L$(LIB_DIR) $(LIB_FLAGS)
 	@echo " "
 
-# Directories
+# Crear carpetas
 $(BIN_DIR):
 	mkdir -p $@
 

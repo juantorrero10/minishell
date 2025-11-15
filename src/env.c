@@ -7,6 +7,7 @@
 
 #define MAX_VARNAME_COPY 256
 
+//devuelve el puntero del valor de una variable de entorno
 char* env_get_var(
     char* name, _out_ size_t* var_length) {
 
@@ -20,7 +21,14 @@ char* env_get_var(
     return ret;
 }
 
-char* env_expand_vars(const char* fmt, size_t* length) {
+/**
+ * @brief Expande las variables de entorno en una cadena.
+ * @param fmt cadena original.
+ * @param length [out] longitud de la cadena resultante.
+ * @return cadena con las variables expandidas.
+ * @note se debe liberar el puntero tras su uso.
+ */
+char* env_expand_vars(const char* fmt, _out_ size_t* length) {
     size_t idx = 0, out_len = 0, start = 0;
     size_t alloc_size = 1;
     char* output = malloc(1);
@@ -61,7 +69,7 @@ char* env_expand_vars(const char* fmt, size_t* length) {
             size_t var_len = idx - start;
             if (paren && fmt[idx] == ')') idx++; // saltar ')'
 
-            // Copiar variable, no dejar copiar mas de MAX_VARNAME_COPY bytes (256 si no lo he cambiado)
+            // Copiar variable, no dejar copiar mas de MAX_VARNAME_COPY bytes
             memset(varname, 0, MAX_VARNAME_COPY);
             if (var_len >= MAX_VARNAME_COPY) var_len = MAX_VARNAME_COPY - 1;
             strncpy(varname, fmt + start, var_len);
@@ -91,7 +99,12 @@ char* env_expand_vars(const char* fmt, size_t* length) {
     return output;
 }
 
-
+/**
+ * @brief Expande las variables de entorno en todos los argumentos de una linea de comando.
+ * @param og objeto tline original.
+ * @return objeto tline con con variables expandidas.
+ * @note se debe liberar el objeto tline tras su uso.
+ */
 tline* env_expand_wholeline(const tline* og) {
     tline* new = NULL;
     size_t sz = 0;
@@ -144,7 +157,7 @@ tline* env_expand_wholeline(const tline* og) {
             memcpy(c.argv[j], tmp, sz + 1);
             free(tmp);
         }
-        // Añadir la string nula
+        // Añadir string nula
         c.argv[og->commands[i].argc] = NULL;
         new->commands[i].argv = c.argv;
     }
