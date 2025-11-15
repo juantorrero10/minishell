@@ -13,8 +13,7 @@ const char* banner =
 "                               /    \\| | '_ \\| / __| '_ \\ / _ \\ | |\n"
 "                              / /\\/\\ \\ | | | | \\__ \\ | | |  __/ | |\n"
 "                              \\/    \\/_|_| |_|_|___/_| |_|\\___|_|_|\n"
-"                                                                     \n"
-"                                           Creado por: Juan Torrero de Pablo\n\n\n";
+"                                                                     \n";
 #endif
 #endif
 /**

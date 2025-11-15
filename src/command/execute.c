@@ -5,9 +5,9 @@
  * @brief Cerrar los streams de archivos usados para redirecciones.
  */
 static void close_file_streams(struct file_streams streams) {
-    if (streams.out != stdout) fclose(streams.out); else fflush(stdout);
-    if (streams.in != stdin) fclose(streams.in); // no flush de stdin   
-    if (streams.err != stderr) fclose(streams.err); else fflush(stderr);
+    if (streams.out != stdout && streams.out) fclose(streams.out); else fflush(stdout);
+    if (streams.in != stdin   && streams.in)  fclose(streams.in); // no flush de stdin   
+    if (streams.err != stderr && streams.err) fclose(streams.err); else fflush(stderr);
 }
 
 
@@ -22,7 +22,7 @@ static void close_file_streams(struct file_streams streams) {
 static int launch_builtin(int idx, int argc, char** argv, struct file_streams streams) {
     int ret = 0;
     if (idx == EXIT_COMMAND_NOT_FOUND){
-        MSH_ERR("%s: command not found", argv[0]);
+        MSH_ERR("%s: no se encuentra el mandato", argv[0]);
         return idx;
     }
     ret = g_builtin_function_table[idx].fptr(argc, argv, streams);
@@ -82,7 +82,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
     // Si no es el último crear un pipe.
     if ( i < (n - 1)) {
         if (pipe(pipe_fd) == -1) {
-            MSH_ERR("error creating pipe");
+            MSH_ERR("%s: error al crear el 'pipe'", tokens->commands[i].argv[0]);
             perror("pipe");
             return EXIT_ERROR_CREATING_PIPE;
         }
@@ -92,7 +92,7 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
     // Proceso padre: guardar PID, gestionar pipes.
     pid = fork();
     if (pid == -1) {
-        MSH_ERR("fork of '%s' failed", tokens->commands[i].argv[0]);
+        MSH_ERR("'%s' no se pudo crear el 'fork'", tokens->commands[i].argv[0]);
         perror("fork"); return EXIT_ERROR_FORKING;
     };
     /**

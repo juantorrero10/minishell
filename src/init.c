@@ -96,7 +96,7 @@ void init_minishell(int argc, char** argv) {
     }
     // Imprimir banner si no estamos en debug
 #ifndef __DEBUG
-    printf("%s", banner);
+    if (argc == 1 || strcmp(argv[1], "-s")) printf("%s", banner);
 #endif
     INFO("TERMINAL PID: %d", getpid());
     WARN("DEBUG MODE");
