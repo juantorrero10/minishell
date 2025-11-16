@@ -21,6 +21,9 @@
 #include <ctype.h>
 
 #include <parser.h>
+
+#include <parser/public.h>
+
 #include <macros.h>
 #include <prompt.h>
 #include <read.h>

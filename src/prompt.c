@@ -56,3 +56,26 @@ void prompt_print_last_errorcode() {
 }
 
 void prompt_print_str(char* s) { printf("%s", s);}
+
+void prompt_print_hostname() {
+    char hostname[128];
+    gethostname(hostname, 128);
+    printf("%s", hostname);
+}
+
+void prompt_print_git_branch() {
+    FILE *f = popen("git rev-parse --abbrev-ref HEAD 2>/dev/null", "r");
+    if (f == NULL) {
+        return;
+    }
+    else {
+        char branch[128];
+        if (fgets(branch, sizeof(branch), f) != NULL) {
+            // Eliminar salto de linea
+            branch[strcspn(branch, "\n")] = 0;
+            printf("%s", branch);
+        }
+        pclose(f);
+    }
+
+}

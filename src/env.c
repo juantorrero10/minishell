@@ -31,16 +31,18 @@ char* env_get_var(
 char* env_expand_vars(const char* fmt, _out_ size_t* length) {
     size_t idx = 0, out_len = 0, start = 0;
     size_t alloc_size = 1;
-    char* output = malloc(1);
+    char* output = malloc(1); 
     bool paren = false;
     char varname[MAX_VARNAME_COPY];
 
-
     if (!output) return NULL;
+    output[0] = '\0';
     if (!fmt) {free(output); return NULL;}
     while (fmt[idx]) {
         if (fmt[idx] == '$') {
             idx++;
+
+            if (fmt[idx] == '$') {strcat(output, "$"), idx++, out_len++, alloc_size++; continue;}
 
             paren = 0;
             start = idx;

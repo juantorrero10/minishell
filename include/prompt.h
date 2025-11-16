@@ -9,6 +9,8 @@ void prompt_print_cwd(bool abrv_home);
 void prompt_print_username();
 void prompt_print_last_errorcode();
 void prompt_print_str(char* s);
+void prompt_print_hostname();
+void prompt_print_git_branch();
 
 int prompt_get_last_errorcode();
 
@@ -46,15 +48,15 @@ int prompt_get_last_errorcode();
     STYLE_BOLD(stdout);                                                     \
     prompt_print_username();                                                \
     COLOR_RESET(stdout);                                                    \
-    COLOR_RESET(stdout);                                                    \
-                                                                             \
     prompt_print_str(" ");                                                  \
-                                                                             \
-    /* pwd */                                         \
     COLOR_BRIGHT_CYAN(stdout);                                              \
     prompt_print_cwd(true);                                                 \
-    COLOR_RESET(stdout);                                                    \
     prompt_print_str(" ");                                                  \
+    COLOR_YELLOW(stdout);                                            \
+    STYLE_ITALIC(stdout);                                                    \
+    prompt_print_git_branch();                                              \
+    prompt_print_str(" ");                                                  \
+    COLOR_RESET(stdout);                                                    \
                                                                              \
     /* Final arrow */                                                       \
     STYLE_BOLD(stdout);                                                     \

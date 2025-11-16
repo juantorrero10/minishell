@@ -104,7 +104,6 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     tline* line = NULL;
     tline* expanded = NULL;
     char buff2[INPUT_LINE_MAX];
-    char t; (void)t;
     int ret = 0;
 
     // Imprimir el "prompt"
