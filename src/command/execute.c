@@ -76,6 +76,7 @@ static void print_command(tline* tokens) {
 static int launch_external(int i, tline *tokens, struct file_streams fss, job_t* job, int* pipe_fd, int* prev_pipe) {
     pid_t pid = 0;
     int n = 0;
+    int spgret = 0;
     
     n = tokens->ncommands;
     // Si no es el último crear un pipe.
@@ -119,10 +120,15 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
             close(pipe_fd[0]);
         }
 
+        signal(SIGTSTP,  SIG_DFL);
+        signal(SIGTTIN,  SIG_DFL);
+        signal(SIGTTOU,  SIG_DFL);
+
 
         //Ejecutar comando
-        setpgid(0, 0);
+        setpgid(0, job->pgid);
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
+
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
         // Si ha ocurrido un error.
         perror(tokens->commands[i].filename);
@@ -133,7 +139,11 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
         /*--------------------- PROCESO PADRE ---------------------*/
         job->pids[i] = pid;
         if (i == 0) job->pgid = pid; // el pgid es el pid del primer proceso.
-        setpgid(pid, job->pgid);
+        spgret = setpgid(pid, job->pgid);
+        if (spgret == -1) WARN("setpgid(): %d", spgret); else OKAY("setpgid(): %d", spgret);
+        if (i == 0 && !tokens->background) tcsetpgrp(STDIN_FILENO, job->pgid);
+
+        // find / -type f | xargs du -b > /dev/null >& /dev/null
 
         // Si no es el primero, cerrar la anterior
         if (*prev_pipe != -1) close(*prev_pipe);
@@ -189,13 +199,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     }
     
     job.cmdline = strdup(cmdline);
-
-    // Ignorar estas señales durante la ejecucion.
-    signal(SIGTTOU, SIG_IGN);
-    signal(SIGTTIN, SIG_IGN);
-
-    // Restablecer SIGSTSTP
-    signal(SIGTSTP, SIG_DFL);
 
     // Determinar si es necesario sobreescribir
     while (command_overwrite[ret]) {
@@ -253,7 +256,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     // Si es un trabajo en primer dar control de la terminal y esperarle.
     if (!tokens->background) {
         g_dont_nl = 1;
-        tcsetpgrp(STDIN_FILENO, job.pgid); // Dar control.
+        //tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
             if (job.pids[i] == -1) continue;
@@ -261,7 +264,7 @@ int execute_command(tline* tokens, const char* cmdline) {
             INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
             // Si se detiene el trabajo con CTRL+Z -> añadir a la lista de trabajos.
             if (WIFSTOPPED(status)) {
-                tcsetpgrp(STDIN_FILENO, getpid()); // devolver control.
+                tcsetpgrp(STDIN_FILENO, getpgrp()); // devolver control.
                 job.state = STOPPED;
                 job.background = 1;
                 job.id = job_add(job);  // Añadir trabajo a la lista
@@ -269,11 +272,17 @@ int execute_command(tline* tokens, const char* cmdline) {
                 MSH_LOG("nuevo trabajo: [%d] %d (Detenido)", job.id, job.pgid);
                 ret = 0;
                 not_interrupted = 1;
-                signal(SIGTSTP, sigtstp_handle);
+                signal(SIGTTIN, SIG_IGN);
+                signal(SIGTTOU, SIG_IGN);
+                signal(SIGTSTP, SIG_IGN);
                 break;
             }
         }  if (!last_internal && !not_interrupted)ret = WEXITSTATUS(status);
-        tcsetpgrp(STDIN_FILENO, getpid()); // Quitar control.
+        tcsetpgrp(STDIN_FILENO, getpgrp()); // Quitar control.
+        // Restrablecer señales.
+        signal(SIGTTIN, SIG_IGN);
+        signal(SIGTTOU, SIG_IGN);
+        signal(SIGTSTP, SIG_IGN);
         g_dont_nl = 0;
 
         
@@ -296,8 +305,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     // Limpiar memoria.
     free(job.pids);
     free(job.cmdline);
-    // Restablecer señal
-    signal(SIGTSTP, sigtstp_handle);
     INFO("END execute_command");
     return ret;
 }

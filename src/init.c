@@ -20,6 +20,7 @@ int g_exit_signal = 0;
 bool g_dont_nl = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;
+struct termios g_oldattr = {0};
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},
         {"cd", builtin_chdir},
@@ -55,7 +56,9 @@ static void init_install_signals(void) {
     }
 
     signal(SIGCHLD, sigchld_handler);
-    signal(SIGTSTP, sigtstp_handle);
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTIN,  SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
 
     
 }
@@ -87,8 +90,12 @@ static int init_shell_env(const char *argv0) {
 void init_minishell(int argc, char** argv) {
     (void)argc;
     size_t idx = 0;
+    
     init_install_signals();
     if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
+
+    // Guardar atributos para restablecerlos despues de cada commando.
+    tcgetattr(STDIN_FILENO, &g_oldattr);
 
     //Obtener el numero de variables de entorno
     while(environ[idx++]) {

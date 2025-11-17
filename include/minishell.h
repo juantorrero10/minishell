@@ -19,6 +19,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <ctype.h>
+#include <termios.h>
 
 #include <parser.h>
 #include <macros.h>

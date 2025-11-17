@@ -107,6 +107,9 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     char t; (void)t;
     int ret = 0;
 
+    // Restablecer atributos
+    tcsetattr(STDIN_FILENO, TCSANOW, &g_oldattr);
+
     // Imprimir el "prompt"
     if (print_prompt) {PROMPT_PRINT();}
     fgets(buff, max, stdin);
