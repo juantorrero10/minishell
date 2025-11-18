@@ -12,9 +12,7 @@ static void push_token(token_arr* a, token_t* tok) {
         a->ptr = malloc(sizeof(token_t)*INITIAL_ALLOC_SIZE);
         *a->ptr = t;
         a->allocated = INITIAL_ALLOC_SIZE; a->occupied = 1;
-        if (t.value)a->ptr[0].value = strdup(t.value);
-        if (t.value)free(t.value);
-        tok->value = NULL;
+        if (t.value)a->ptr[0].value = t.value;
         return;
     } 
     if ( a->allocated < a->occupied+1) {
@@ -23,8 +21,8 @@ static void push_token(token_arr* a, token_t* tok) {
     }
     
     a->ptr[a->occupied] = t;
-    if (t.value)a->ptr[a->occupied++].value = strdup(t.value);
-    if (t.value)free(t.value);
+    if (t.value)a->ptr[a->occupied].value = t.value;
+    a->occupied++;
     tok->value = NULL;
 }
 /*
@@ -47,7 +45,7 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     bool squoted = 0;
 
     size_t len = we - ws;
-    const char *src = cmdline + ws;
+    char *src = cmdline + ws;
 
     // worst case: same length, no quotes removed
     char *buf = malloc(len + 1);
@@ -55,6 +53,7 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
 
     for (size_t i = 0; i < len; i++) {
         char c = src[i];
+
 
         if (c == '"' && !squoted) {
             dquoted ^= 1;
@@ -71,7 +70,6 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
 
     buf[w] = '\0';
     ret.value = buf;
-    printf("new word: %s\n", ret.value);
     return ret;
 }
 
@@ -90,7 +88,7 @@ void free_token_arr(token_arr* a) {
 /**
  * @brief tokenize through state machine.
  */
-token_arr tokenize(char* cmdline, _out_ size_t* arr_sz) {
+token_arr tokenize(char* cmdline, _out_ int* st) {
     char* ptr;
     size_t len;
     size_t i = 0;
@@ -100,13 +98,17 @@ token_arr tokenize(char* cmdline, _out_ size_t* arr_sz) {
     char c = 0; (void)c;
     bool dquoted = 0;
     bool squoted = 0;
+    bool bracketed_var = 0;
+    int cmd_sub = 0;
+    bool exit_s = 0;
     token_arr r = {NULL, 0, 0};
+    typeof_token tt = TOK_WORD;
 
     ptr = cmdline;
-    *arr_sz = 0;
+    *st = 0;
     len = strlen(cmdline);
-    if (!cmdline) {arr_sz = 0; return r;}
-    if (!len) {arr_sz = 0; return r;}
+    if (!cmdline) {*st = 1; return r;}
+    if (!len) {*st = 1; return r;}
 
 init:
     curr = (token_t){.type = TOK_ERROR, .number = 0, .value = NULL };
@@ -116,9 +118,30 @@ init:
 word:
     switch (ptr[i])
     {
-    case 0: goto finish_word;
+    case 0: exit_s = 1; goto finish_word;
     case '"' : if (!squoted)dquoted ^= 1; i++ ;word_end++; goto word;
     case '\'': if (!dquoted)squoted ^= 1; i++ ;word_end++; goto word;
+    case '$': goto mixed_state_var_subst;
+    case '{': goto mixed_state_group_var;
+    case '}': 
+        if (word_start < word_end) goto finish_word;
+        if (bracketed_var) {
+            error_parse(ERR_UNEXP, ptr + i); *st=1;i++;goto __exit;}
+        else {
+            curr.type = TOK_RBRACE; push_token(&r, &curr); i++;goto init;}
+
+    case '(':
+            if (word_start < word_end) goto finish_word;
+            curr.type = TOK_LPAREN; 
+            push_token(&r, &curr); 
+            i++;goto init;
+
+    case ')':
+            if (word_start < word_end) goto finish_word;
+            if (cmd_sub) {
+                curr.type = TOK_CMD_ST_END; push_token(&r, &curr); i++;cmd_sub--;goto init;
+            } curr.type = TOK_RPAREN; push_token(&r, &curr); i++;goto init;
+
     
     default:
         if (isokforwords(ptr[i]) || 
@@ -127,19 +150,96 @@ word:
             i++;
             goto word;
         } else {
-            if (ptr[i] != ' ') {error_parse(ERR_UNEXP, ptr + i); goto __exit;}
+            if (ptr[i] != ' ') {error_parse(ERR_UNEXP, ptr + i); *st=1;goto __exit;}
             i++;
             goto finish_word;
         }
     }
 
-finish_word:
+
+mixed_state_group_var:
+    //emit what word there was
     if (word_end > word_start) {
         curr = carve_word(ptr, word_start, word_end);
         push_token(&r, &curr);
+    } i++; word_end = i; word_start = i;
+    switch (ptr[i])
+    {
+    case '$':
+        i++;
+        bracketed_var = 1;
+        word_start = i;word_end = i;
+        goto var;
+    
+    default:
+        if (isokforwords_sp(ptr[i])) {
+            curr = (token_t){.type = TOK_LBRACE, .value = NULL, .number = 0};
+            push_token(&r, &curr);
+            goto init;
+        }
+        break;
+    }
+
+//maybe its a VAR or a SUBSTITUTION;
+mixed_state_var_subst:
+    //emit what word there was
+    if (word_end > word_start) {
+        curr = carve_word(ptr, word_start, word_end);
+        push_token(&r, &curr);
+    }
+    i++; word_end = i; word_start = i;
+    switch (ptr[i])
+    {
+    // bracketed var
+    case '{':
+        i++;
+        bracketed_var = 1;
+        word_start = i;word_end = i;
+        goto var;
+    // command substitution
+    case '(':
+        curr = (token_t){.type = TOK_CMD_ST_START, .value = NULL, .number = 0};
+        push_token(&r, &curr);
+        i++; cmd_sub++;
+        goto init;
+    default:
+        if (isokforvars(ptr[i])) {word_start = i;word_end = i;goto var;}
+        break;
+    }
+
+// advance until } or until non-alphanumerical (nor _) character an emit that word as a var
+var:
+    switch (ptr[i])
+    {
+    case 0: exit_s = 1; tt = TOK_VAR; goto finish_word;
+    case '}':
+        if (!bracketed_var) goto init;
+        tt = TOK_VAR;
+        bracketed_var = 0;
+        i++;
+        goto finish_word;
+    
+    default:
+        if (isokforvars(ptr[i])) {
+            i++;
+            word_end++;
+            goto var;
+        } else {
+            tt = TOK_VAR;
+            goto finish_word;
+        }
+        break;
+    }
+
+finish_word:
+    if (word_end > word_start) {
+        curr = carve_word(ptr, word_start, word_end);
+        curr.type = tt;
+        tt = TOK_WORD;
+        push_token(&r, &curr);
         goto init;
     }
-    goto __exit;
+    if (!exit_s) goto init;
 
 __exit:
     
