@@ -7,7 +7,6 @@ const char* str_tok(typeof_token tt, char buff[])
 {
     switch (tt) {
         case TOK_WORD:                 strcpy(buff, "WORD"); break;
-        case TOK_VAR:                  strcpy(buff, "VAR"); break;
 
         /* separators */
         case TOK_PIPE:                 strcpy(buff, "|"); break;
@@ -55,7 +54,7 @@ void pu_peek(token_arr* arr) {
     {
         c = arr->ptr + i;
         str_tok(c->type, buff);
-        DUMP("%zu:\t%s,\tnum:%d\tval:%s", i, buff, c->number, c->value);
+        DUMP("%zu:\t%s,\t\tnum:%d\t\tval:%s", i, buff, c->number, c->value);
 
     }
     
