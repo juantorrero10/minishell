@@ -85,6 +85,10 @@ void free_token_arr(token_arr* a) {
     a->ptr = NULL;
 }
 
+/**
+ * @brief tokenizer state machine:
+ * function may be called recurssivelly
+ */
 token_arr tokenize(char *cmdline, _out_ int *st)
 {
     scanner s;
@@ -117,18 +121,18 @@ init:
 word:
     // ' everything is allowed but its litteral.
     if (squoted) {
-    if (s.curr == '\'') {
-        squoted = 0;
+        if (s.curr == '\'') {
+            squoted = 0;
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        }
         scanner_next(&s);
         word_end = s.i;
         goto word;
     }
-    scanner_next(&s);
-    word_end = s.i;
-    goto word;
-}
 
-    // " everything is allowed but it expands
+    // " everything is allowed, and its literal for NOW
     if (dquoted) {
         if (s.curr == '"') {
             dquoted = 0;
@@ -136,6 +140,9 @@ word:
             word_end = s.i;
             goto word;
         }
+        scanner_next(&s);
+        word_end = s.i;
+        goto word;
     }
 
     if (scanner_eof(&s)) {
@@ -162,11 +169,6 @@ word:
 
     // If quoted add to the word
     case '{':
-        if (dquoted || squoted) {
-            scanner_next(&s);
-            word_end = s.i;
-            goto word;
-        }
 
         if (dollar == 1) {
             scanner_next(&s); word_end = s.i;
@@ -185,12 +187,6 @@ word:
         }
 
     case '}':
-        if (dquoted || squoted) {
-            scanner_next(&s);
-            word_end = s.i;
-            goto word;
-        }
-
         if (bracketed_var) {
             scanner_next(&s); word_end = s.i;
             bracketed_var = 0;
@@ -206,12 +202,7 @@ word:
         goto init;
     // Subshells are ignored in "" and ''
     case '(':
-        if ((dquoted && !dollar) || squoted) {
-            scanner_next(&s);
-            word_end = s.i;
-            dollar = 0;
-            goto word;
-        } 
+
         // If theres a word previously
         if (word_end > word_start) {
             if (dollar) word_end--;
