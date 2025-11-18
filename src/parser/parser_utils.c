@@ -17,10 +17,10 @@ const char* str_tok(typeof_token tt, char buff[])
         case TOK_AMP:                  strcpy(buff, "&"); break;
 
         /* groupers */
-        case TOK_LPAREN:               strcpy(buff, "("); break;
-        case TOK_CMD_ST_START:         strcpy(buff, "$("); break;
-        case TOK_CMD_ST_END:           strcpy(buff, ")"); break;
-        case TOK_RPAREN:               strcpy(buff, ")"); break;
+        case TOK_LPAREN:               strcpy(buff, "(  [SS]"); break;
+        case TOK_CMD_ST_START:         strcpy(buff, "$( [ST]"); break;
+        case TOK_CMD_ST_END:           strcpy(buff, ")  [ST]"); break;
+        case TOK_RPAREN:               strcpy(buff, ")  [SS]"); break;
         case TOK_LBRACE:               strcpy(buff, "{"); break;
         case TOK_RBRACE:               strcpy(buff, "}"); break;
 
@@ -55,7 +55,7 @@ void pu_peek(token_arr* arr) {
     {
         c = arr->ptr + i;
         str_tok(c->type, buff);
-        DUMP("%zu: %s,\tval:%s,\tnum:%d", i, buff, c->value, c->number);
+        DUMP("%zu:\t%s,\tnum:%d\tval:%s", i, buff, c->number, c->value);
 
     }
     

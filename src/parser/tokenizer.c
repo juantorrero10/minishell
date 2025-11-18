@@ -85,163 +85,265 @@ void free_token_arr(token_arr* a) {
     a->ptr = NULL;
 }
 
-/**
- * @brief tokenize through state machine.
- */
-token_arr tokenize(char* cmdline, _out_ int* st) {
-    char* ptr;
-    size_t len;
-    size_t i = 0;
+token_arr tokenize(char *cmdline, _out_ int *st)
+{
+    scanner s;
+    token_arr r = {NULL, 0, 0};
+    token_t curr = {0};
+
     size_t word_start = 0;
     size_t word_end = 0;
-    token_t curr = {0}; (void) curr;
-    char c = 0; (void)c;
-    bool dquoted = 0;
-    bool squoted = 0;
-    bool bracketed_var = 0;
-    int cmd_sub = 0;
-    bool exit_s = 0;
-    token_arr r = {NULL, 0, 0};
+    size_t word_len;
     typeof_token tt = TOK_WORD;
 
-    ptr = cmdline;
+    int dquoted = 0;
+    int squoted = 0;
+    int bracketed_var = 0;
+    int cmd_sub = 0;
+
+    int exit_s = 0;
+
     *st = 0;
-    len = strlen(cmdline);
-    if (!cmdline) {*st = 1; return r;}
-    if (!len) {*st = 1; return r;}
+    if (!cmdline) { *st = 1; return r; }
+    scanner_init(&s, cmdline);
 
 init:
-    curr = (token_t){.type = TOK_ERROR, .number = 0, .value = NULL };
-    word_end = i;
-    word_start = i;
+    curr = (token_t){ .type = TOK_ERROR, .number = 0, .value = NULL };
+    word_start = s.i;
+    word_end   = s.i;
+    tt = TOK_WORD;
 
 word:
-    switch (ptr[i])
+    // ' everything is allowed but its litteral.
+    if (squoted) {
+    if (s.curr == '\'') {
+        squoted = 0;
+        scanner_next(&s);
+        word_end = s.i;
+        goto word;
+    }
+    scanner_next(&s);
+    word_end = s.i;
+    goto word;
+}
+
+    // " everything is allowed but it expands
+    if (dquoted) {
+        if (s.curr == '"') {
+            dquoted = 0;
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        }
+    }
+
+    if (scanner_eof(&s)) {
+        exit_s = 1;
+        goto finish_word;
+    }
+
+    switch (s.curr)
     {
-    case 0: exit_s = 1; goto finish_word;
-    case '"' : if (!squoted)dquoted ^= 1; i++ ;word_end++; goto word;
-    case '\'': if (!dquoted)squoted ^= 1; i++ ;word_end++; goto word;
-    case '$': goto mixed_state_var_subst;
-    case '{': goto mixed_state_group_var;
-    case '}': 
-        if (word_start < word_end) goto finish_word;
+    case '"':
+        if (!squoted) dquoted ^= 1;
+        scanner_next(&s);
+        word_end = s.i;
+        goto word;
+
+    case '\'':
+        if (!dquoted) squoted ^= 1;
+        scanner_next(&s);
+        word_end = s.i;
+        goto word;
+
+    case '$':
+        goto mixed_state_var_subst;
+
+    case '{':
+        goto mixed_state_group_var;
+
+    case '}':
+        if (word_end > word_start)
+            goto finish_word;
+
         if (bracketed_var) {
-            error_parse(ERR_UNEXP, ptr + i); *st=1;i++;goto __exit;}
-        else {
-            curr.type = TOK_RBRACE; push_token(&r, &curr); i++;goto init;}
+            error_parse(ERR_UNEXP, cmdline + s.i);
+            *st = 1;
+            scanner_next(&s);
+            goto __exit;
+        }
+        curr = (token_t){0};
+        curr.type = TOK_RBRACE;
+        push_token(&r, &curr);
+        scanner_next(&s);
+        goto init;
 
     case '(':
-            if (word_start < word_end) goto finish_word;
-            curr.type = TOK_LPAREN; 
-            push_token(&r, &curr); 
-            i++;goto init;
+        if (word_end > word_start)
+            goto finish_word;
+        curr = (token_t){0};
+        curr.type = TOK_LPAREN;
+        push_token(&r, &curr);
+        scanner_next(&s);
+        goto init;
 
     case ')':
-            if (word_start < word_end) goto finish_word;
-            if (cmd_sub) {
-                curr.type = TOK_CMD_ST_END; push_token(&r, &curr); i++;cmd_sub--;goto init;
-            } curr.type = TOK_RPAREN; push_token(&r, &curr); i++;goto init;
-
-    
-    default:
-        if (isokforwords(ptr[i]) || 
-        (ptr[i] == ' ' && (dquoted || squoted))) {
-            word_end++;
-            i++;
-            goto word;
-        } else {
-            if (ptr[i] != ' ') {error_parse(ERR_UNEXP, ptr + i); *st=1;goto __exit;}
-            i++;
+        if (word_end > word_start)
             goto finish_word;
-        }
-    }
 
-
-mixed_state_group_var:
-    //emit what word there was
-    if (word_end > word_start) {
-        curr = carve_word(ptr, word_start, word_end);
-        push_token(&r, &curr);
-    } i++; word_end = i; word_start = i;
-    switch (ptr[i])
-    {
-    case '$':
-        i++;
-        bracketed_var = 1;
-        word_start = i;word_end = i;
-        goto var;
-    
-    default:
-        if (isokforwords_sp(ptr[i])) {
-            curr = (token_t){.type = TOK_LBRACE, .value = NULL, .number = 0};
+        if (cmd_sub) {
+            curr = (token_t){0};
+            curr.type = TOK_CMD_ST_END;
             push_token(&r, &curr);
+            cmd_sub--;
+            scanner_next(&s);
             goto init;
         }
-        break;
-    }
-
-//maybe its a VAR or a SUBSTITUTION;
-mixed_state_var_subst:
-    //emit what word there was
-    if (word_end > word_start) {
-        curr = carve_word(ptr, word_start, word_end);
+        curr = (token_t){0};
+        curr.type = TOK_RPAREN;
         push_token(&r, &curr);
-    }
-    i++; word_end = i; word_start = i;
-    switch (ptr[i])
-    {
-    // bracketed var
-    case '{':
-        i++;
-        bracketed_var = 1;
-        word_start = i;word_end = i;
-        goto var;
-    // command substitution
-    case '(':
-        curr = (token_t){.type = TOK_CMD_ST_START, .value = NULL, .number = 0};
-        push_token(&r, &curr);
-        i++; cmd_sub++;
+        scanner_next(&s);
         goto init;
+
+    case ' ':
+        if (dquoted || squoted) {
+            /* space inside quotes */
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        }
+        /* unquoted space ends word */
+        scanner_next(&s);
+        goto finish_word;
+
     default:
-        if (isokforvars(ptr[i])) {word_start = i;word_end = i;goto var;}
+        if (isokforwords(s.curr)) {
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        } else if (dquoted) {
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        }
+
+        error_parse(ERR_UNEXP, cmdline + s.i);
+        *st = 1;
+        goto __exit;
+    }
+
+/* ------ variable states ------ */
+
+mixed_state_group_var:
+    if (word_end > word_start) {
+        curr = carve_word(cmdline, word_start, word_end);
+        push_token(&r, &curr);
+    }
+
+    /* past '{' */
+    scanner_next(&s);
+    word_start = s.i;
+    word_end   = s.i;
+
+    if (s.curr == '$') {
+        bracketed_var = 1;
+        scanner_next(&s);
+        word_start = s.i;
+        word_end   = s.i;
+        goto var;
+    }
+    curr = (token_t){0};
+    curr.type = TOK_LBRACE;
+    push_token(&r, &curr);
+    goto init;
+
+
+mixed_state_var_subst:
+    if (word_end > word_start) {
+        curr = carve_word(cmdline, word_start, word_end);
+        push_token(&r, &curr);
+    }
+
+    scanner_next(&s);
+    word_start = s.i;
+    word_end   = s.i;
+
+    switch (s.curr)
+    {
+    //Special var $$ -> replaces with $MSH_PID
+    case '$':
+        scanner_next(&s);
+        curr.type = TOK_VAR;
+        curr.value = strdup("MSH_PID");
+        push_token(&r, &curr);
+        word_start = s.i;
+        word_end   = s.i;
+        goto init;
+
+
+    case '{':
+        scanner_next(&s);
+        bracketed_var = 1;
+        word_start = s.i;
+        word_end   = s.i;
+        goto var;
+
+    case '(':
+        curr = (token_t){0};
+        curr.type = TOK_CMD_ST_START;
+        push_token(&r, &curr);
+        cmd_sub++;
+        scanner_next(&s);
+        goto init;
+
+    default:
+        if (isokforvars(s.curr))
+            goto var;
         break;
     }
 
-// advance until } or until non-alphanumerical (nor _) character an emit that word as a var
 var:
-    switch (ptr[i])
-    {
-    case 0: exit_s = 1; tt = TOK_VAR; goto finish_word;
-    case '}':
-        if (!bracketed_var) goto init;
+    if (scanner_eof(&s)) {
+        tt = TOK_VAR;
+        exit_s = 1;
+        goto finish_word;
+    }
+
+    if (s.curr == '}') {
+        if (!bracketed_var)
+            goto finish_word;
+
         tt = TOK_VAR;
         bracketed_var = 0;
-        i++;
+        scanner_next(&s);
         goto finish_word;
-    
-    default:
-        if (isokforvars(ptr[i])) {
-            i++;
-            word_end++;
-            goto var;
-        } else {
-            tt = TOK_VAR;
-            goto finish_word;
-        }
-        break;
     }
+
+    if (isokforvars(s.curr)) {
+        scanner_next(&s);
+        word_end = s.i;
+        goto var;
+    }
+
+    tt = TOK_VAR;
+    goto finish_word;
+
+
+/* ------ finishing words ------ */
 
 finish_word:
     if (word_end > word_start) {
-        curr = carve_word(ptr, word_start, word_end);
+        curr = carve_word(cmdline, word_start, word_end);
         curr.type = tt;
-        tt = TOK_WORD;
-        push_token(&r, &curr);
+        word_len = strlen(curr.value);
+        if(word_len)push_token(&r, &curr);
+        else if (curr.value) free(curr.value);
         goto init;
     }
-    if (!exit_s) goto init;
+
+    if (!exit_s)
+        goto init;
 
 __exit:
-    
     return r;
 }
