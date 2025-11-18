@@ -41,7 +41,13 @@ typedef struct _token_generic_type{
     typeof_token type;
     char *value;    // for WORDs, strings
     int number;     // fd number (optional)
-}token_t, *ptoken_t;
+}token_t;
+
+typedef struct _token_arr_type {
+    token_t* ptr;
+    size_t allocated;
+    size_t occupied;
+}token_arr; 
 
 /*-------------------------- AST -------------------------*/
 typedef enum {
@@ -103,10 +109,10 @@ typedef struct {
 
 
 typedef struct {
-    typeof_token sep_type;          // type: {AND_IF, SEMI}
+    typeof_token sep_type;          // type: {AND_IF, OR_IF, SEMI}
     ast_t *left;
     ast_t *right;
-} ast_node_separator_t;
+} ast_node_list_t;
 
 
 struct _ast_generic_type {
@@ -114,11 +120,13 @@ struct _ast_generic_type {
     union {
         ast_node_command_t cmd;
         ast_node_pipeline_t ppl;
-        ast_node_separator_t sep;
+        ast_node_list_t sep;
         ast_node_group_t grp;
         ast_node_substitution_t sub;
         ast_node_redir_t  redir;
     };
 };
+
+
 
 #endif // PARSER_GRAMMAR_H_

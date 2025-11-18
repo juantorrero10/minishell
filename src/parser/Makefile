@@ -13,7 +13,7 @@ BIN_THIS=build/bin/parser
 SRC_DIR=.
 
 # archivos .c fuente
-SRC = ast.c testdemo.c parser.c errors.c heredoc.c tokenizer.c parser.c redir.c
+SRC = ast.c testdemo.c parser.c errors.c heredoc.c tokenizer.c redir.c
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
 # No libs
