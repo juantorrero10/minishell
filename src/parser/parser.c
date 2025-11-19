@@ -9,7 +9,18 @@
 ast_t* parse_command(char* cmdline) {
     int sz = 0;
     token_arr arr = {NULL, 0, 0}; (void)arr;
-
+    char* trim_chars = "\t\r\n ";
+    sz = strlen(cmdline);
+    
+    //trim characters
+    for (int i = ((int)sz)-1; i >= 0; i--)
+    {
+        if (strchr(trim_chars, cmdline[i])) {
+            cmdline[i] = '\0';
+            sz--;
+        } else break;
+    }
+    
 
     if (pu_check_balance(cmdline, strlen(cmdline)))return NULL;
     arr = tokenize(cmdline, &sz);

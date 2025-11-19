@@ -22,6 +22,8 @@ const char* str_tok(typeof_token tt, char buff[])
         case TOK_RPAREN:               strcpy(buff, ")  [SS]"); break;
         case TOK_LBRACE:               strcpy(buff, "{"); break;
         case TOK_RBRACE:               strcpy(buff, "}"); break;
+        case TOK_DQ_START:             strcpy(buff, "\" (+)"); break;
+        case TOK_DQ_END:               strcpy(buff, "\" (-)"); break;
 
         /* redirections */
         case TOK_REDIR_OUT:            strcpy(buff, ">"); break;
@@ -34,8 +36,8 @@ const char* str_tok(typeof_token tt, char buff[])
         case TOK_REDIR_READ_WRITE:     strcpy(buff, "<>"); break;
 
         /* FD-prefix tokens */
-        case TOK_REDIR_OUT_FD:         strcpy(buff, "FD_OUT"); break;
-        case TOK_REDIR_IN_FD:          strcpy(buff, "FD_IN"); break;
+        case TOK_REDIR_RHS_FD:         strcpy(buff, "FD_RHS"); break;
+        case TOK_REDIR_LHS_FD:          strcpy(buff, "FD_LHS"); break;
 
         /* misc */
         case TOK_EOL:                  strcpy(buff, "EOL"); break;
