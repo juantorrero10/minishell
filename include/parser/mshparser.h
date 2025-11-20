@@ -23,6 +23,9 @@
 #include <parser.h>
 #include <redir.h>
 #include <heredoc.h>
+#include <parser_utils.h>
+#include <scanner.h>
+#include <execute.h>
 
 
 

@@ -13,7 +13,7 @@
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 
 /*------------------ COLOR MACROS ---------------------------------*/
-#define printf_if_std(stream, msg) (isatty(fileno(stream)))? fprintf(stream, msg) : (void)0;
+#define printf_if_std(stream, msg) (isatty(fileno(stream)))? fprintf(stream, msg) : (void)0
 
 #define COLOR_RESET(stream)    printf_if_std(stream, "\033[0m")
 #define STYLE_BOLD(stream)     printf_if_std(stream, "\033[1m")

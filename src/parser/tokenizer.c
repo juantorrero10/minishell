@@ -42,6 +42,7 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     token_t ret = { .type = TOK_WORD, .number = 0, .value = NULL };
 
     ret.value = strndup(cmdline + ws, we - ws);
+    ret.str_idx = ws;
     return ret;
 }
 
@@ -128,7 +129,6 @@ static char pile_pop(char* pile, int* pile_top) {
 
 /**
  * @brief tokenizer state machine:
- * function may be called recurssivelly
  */
 token_arr tokenize(char *cmdline, _out_ int *st)
 {
@@ -167,7 +167,9 @@ token_arr tokenize(char *cmdline, _out_ int *st)
     memset(pile, 0, 100);
 
 init:
+    after_redir = 0;
     curr = (token_t){ .type = TOK_ERROR, .number = 0, .value = NULL };
+    curr.str_idx = s.i;
     word_start = s.i;
     word_end   = s.i;
     tt = TOK_WORD;
@@ -195,10 +197,11 @@ word:
     
     if ((curr.type = scan_redir_type(s.buf + s.i, &curr.number)) != TOK_ERROR) {
         scanner_adv(&s, curr.number); curr.number = 0;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         after_redir = 1;
         curr = (token_t){0};word_start = s.i;word_end = s.i;tt = TOK_WORD;
-    } else {after_redir = 0;}
+    }
 
     switch (s.curr)
     {
@@ -207,6 +210,7 @@ word:
         if (!squoted) {dquoted ^= 1;
         curr = (token_t){0};
         curr.type = (dquoted)? TOK_DQ_START : TOK_DQ_END;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
@@ -242,6 +246,7 @@ word:
                 goto finish_word;
             curr = (token_t){0};
             curr.type = TOK_LBRACE;
+            curr.str_idx = s.i;
             push_token(&r, &curr);
             scanner_next(&s);
             goto init;
@@ -262,6 +267,7 @@ word:
         
         curr = (token_t){0};
         curr.type = TOK_RBRACE;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
@@ -283,6 +289,7 @@ word:
         else curr.type = TOK_LPAREN;
         pile_push(pile, &pile_top, pc);
         dollar = 0;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
@@ -301,6 +308,7 @@ word:
         if (pc == 'C') {
             curr = (token_t){0};
             curr.type = TOK_CMD_ST_END;
+            curr.str_idx = s.i;
             push_token(&r, &curr);
             cmd_sub--;
             scanner_next(&s);
@@ -309,11 +317,16 @@ word:
         }
         curr = (token_t){0};
         curr.type = TOK_RPAREN;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
 
     case ' ':
+        if (after_redir) {
+            while(s.curr == ' ') scanner_next(&s);
+            goto word;
+        }
         if (dquoted || squoted) {
             /* space inside quotes */
             scanner_next(&s);
@@ -337,10 +350,12 @@ word:
         scanner_next(&s);
         if (scanner_eof(&s)) {
             curr.type = TOK_AMP;
+            curr.str_idx = s.i;
             push_token(&r, &curr);
             goto init;
         } else if (s.curr == '&') {
             curr.type = TOK_AND_IF;
+            curr.str_idx = s.i;
             push_token(&r, &curr);
             scanner_next(&s);
             goto init;
@@ -359,11 +374,13 @@ word:
         curr = (token_t){0};
         if (s.curr == '|') {
             curr.type = TOK_OR_IF;
+            curr.str_idx = s.i;
             push_token(&r, &curr);
             scanner_next(&s);
             goto init;
         }
         curr.type = TOK_PIPE;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         goto init;
 
@@ -377,19 +394,30 @@ word:
             goto finish_word;
         curr = (token_t){0};
         curr.type = TOK_SEMI;
+        curr.str_idx = s.i;
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
 
     default:
+        if (after_redir && s.curr == '-') {
+            curr = (token_t){0};
+            curr.type = TOK_REDIR_RHS_CLOSE;
+            curr.str_idx = s.i;
+            push_token(&r, &curr);
+            scanner_next(&s);
+            goto init;
+        }
         if ((n = isnum(s.buf + s.i)) > 0) {
             temp = s.buf + s.i;
             scanner_adv(&s, n);
             word_end = s.i;
             if (after_redir) {
+                
                 temp = strndup(temp, (int)n);
                 curr.number = atoi(temp);
                 curr.type = TOK_REDIR_RHS_FD;
+                curr.str_idx = s.i;
                 push_token(&r, &curr);
                 free(temp);
                 goto init;
@@ -399,6 +427,7 @@ word:
                 temp = strndup(temp, (int)n);
                 curr.number = atoi(temp);
                 curr.type = TOK_REDIR_LHS_FD;
+                curr.str_idx = s.i;
                 push_token(&r, &curr);
                 free(temp);
                 goto init;
@@ -427,6 +456,7 @@ finish_word:
         curr = carve_word(cmdline, word_start, word_end);
         curr.type = tt;
         word_len = strlen(curr.value);
+        curr.str_idx = s.i;
         if(word_len)push_token(&r, &curr);
         else if (curr.value) free(curr.value);
         goto init;
@@ -438,6 +468,7 @@ finish_word:
 __exit:
     curr = (token_t){0};
     curr.type = TOK_EOL;
+    curr.str_idx = s.i;
     push_token(&r, &curr);
     return r;
 }

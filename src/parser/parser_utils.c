@@ -38,6 +38,7 @@ const char* str_tok(typeof_token tt, char buff[])
         /* FD-prefix tokens */
         case TOK_REDIR_RHS_FD:         strcpy(buff, "FD_RHS"); break;
         case TOK_REDIR_LHS_FD:          strcpy(buff, "FD_LHS"); break;
+        case TOK_REDIR_RHS_CLOSE:          strcpy(buff, "-"); break;
 
         /* misc */
         case TOK_EOL:                  strcpy(buff, "EOL"); break;
@@ -150,4 +151,148 @@ int pu_check_balance(char* cmdline, size_t view) {
 done:
     cmdline[view] = saved;
     return ret;
+}
+
+token_cat get_category(typeof_token tt) {    
+    switch (tt)
+    {
+    case TOK_AMP:
+        return TC_BG;
+    case TOK_AND_IF:
+    case TOK_OR_IF:
+    case TOK_SEMI:
+        return TC_SEP;
+    case TOK_LPAREN:
+    case TOK_LBRACE:
+        return TC_GROUP_START;
+    case TOK_RBRACE:
+    case TOK_RPAREN:
+        return TC_GROUP_END;
+    case TOK_PIPE:
+        return TC_PIPE;
+    case TOK_CMD_ST_START:
+        return TC_CMD_SUB_START;
+    case TOK_CMD_ST_END:
+        return TC_CMD_SUB_END;
+    case TOK_REDIR_DUP_IN:
+    case TOK_REDIR_DUP_OUT:
+    case TOK_REDIR_IN:
+    case TOK_REDIR_HEREDOC:
+    case TOK_REDIR_OUT:
+    case TOK_REDIR_HERESTR:
+    case TOK_REDIR_READ_WRITE:
+    case TOK_REDIR_OUT_APPEND:
+        return TC_REDIR;
+    case TOK_REDIR_LHS_FD:
+    case TOK_REDIR_RHS_FD:
+    case TOK_REDIR_RHS_CLOSE:
+        return TC_RD_ST;
+    case TOK_WORD:
+        return TC_WORD;
+    case TOK_DQ_START:
+        return TC_DQ_START;
+    case TOK_DQ_END:
+        return TC_DQ_END;
+    default:
+        return TOK_ERROR;
+    }
+    
+}
+
+/**
+ * @param start zero indexed
+ * @param end   zero indexed
+ */
+token_arr make_arr_view(token_arr* arr, size_t start, size_t end) {
+    token_arr ret = (token_arr){0};
+    if (end == -1) end = arr->occupied - 1;
+
+    if (start > end) {return (token_arr){NULL, 0, 0};}
+
+    //cap with real values
+    start = (start > arr->occupied-1)? arr->occupied-1 : start;
+    end = (end > arr->occupied-1)? arr->occupied-1 : end;
+
+    ret.ptr = arr->ptr + start;
+    ret.occupied = end - start + 1;
+
+    ret.allocated = arr->allocated - start;
+    return ret;
+}
+
+/**
+ * @return idx of token: -1 if not found, -2 if found at invalid pos.
+ */
+int find_list_sep(token_arr* arr, const char* cmdline) {
+    int group_weight    = 0;
+    int idx             = 0;
+    bool found          = 0;
+    token_cat tc;
+    char* ptr           = cmdline;
+
+    if (arr->occupied <= 1) return -1;
+
+    // Search for an open separator.
+    while(arr->ptr[idx].type != TOK_EOL) {
+        tc = get_category(arr->ptr[idx].type);
+        if (tc == TC_GROUP_START)group_weight++;
+        if (tc == TC_GROUP_END)group_weight--;
+        if (!group_weight && tc == TC_SEP) {found=1;break;}
+        idx++;
+    }
+
+    if (!found) return -1;
+
+    // grammar rule: no {&&, ||, ;} at the begining or end of line
+    if (idx == 0 || idx >= arr->occupied-2) {
+        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx));
+        g_abort_ast = 1;
+        return -2;
+    }
+    return idx;
+}
+
+/**
+ * same deal as above
+ */
+int find_pipe(token_arr* arr, const char* cmdline) {
+    int group_weight    = 0;
+    int idx             = 0;
+    bool found          = 0;
+    token_cat tc;
+    char* ptr           = cmdline;
+
+    if (arr->occupied <= 1) return -1;
+
+    // Not the time if there are list separators.
+    if (find_list_sep(arr, cmdline) >= 0) return -1;
+
+    // Search for an open pipe token
+    while(arr->ptr[idx].type != TOK_EOL) {
+        tc = get_category(arr->ptr[idx].type);
+        if (tc == TC_GROUP_START)group_weight++;
+        if (tc == TC_GROUP_END)group_weight--;
+        if (tc == TC_CMD_SUB_START)group_weight++;
+        if (tc == TC_CMD_SUB_END)group_weight--;
+        if (!group_weight && tc == TC_PIPE) {found=1;break;}
+        idx++;
+    }
+
+    if(!found) return -1;
+
+    // grammar rule: no | at the begining or end of line
+    if (idx == 0 || idx >= arr->occupied-1) {
+        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx));
+        g_abort_ast = 1;
+        return -2;
+    }
+}
+
+bool type_in_list(typeof_token t, typeof_token* l, size_t sz) {
+    for (size_t i = 0; i < sz; i++)
+    {
+        if (l[i] == t) return true;
+    }
+    return false;
+    
 }

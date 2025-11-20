@@ -1,0 +1,1 @@
+parse_pipeline dont ignore when quoted, we already do, ignore when cmdsub, add cmdsubs to find_sep ignoring
