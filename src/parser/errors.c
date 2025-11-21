@@ -26,7 +26,7 @@ void error_parse(err_t e, char* s) {
         LPERR("unexpected token: %s%s%c%s%s", STYLE_BOLD, COLOR_RED, *s, COLOR_RESET, s+1);
         break;
     default:
-        LPERR("undefined error: %s", s);
+        LPERR("%s", s);
         break;
     }
 }

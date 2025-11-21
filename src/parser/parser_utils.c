@@ -194,7 +194,7 @@ token_cat get_category(typeof_token tt) {
     case TOK_DQ_END:
         return TC_DQ_END;
     default:
-        return TOK_ERROR;
+        return TC_ERROR;
     }
     
 }
@@ -205,7 +205,7 @@ token_cat get_category(typeof_token tt) {
  */
 token_arr make_arr_view(token_arr* arr, size_t start, size_t end) {
     token_arr ret = (token_arr){0};
-    if (end == -1) end = arr->occupied - 1;
+    if (end == __INT32_MAX__) end = arr->occupied - 1;
 
     if (start > end) {return (token_arr){NULL, 0, 0};}
 
@@ -223,31 +223,35 @@ token_arr make_arr_view(token_arr* arr, size_t start, size_t end) {
 /**
  * @return idx of token: -1 if not found, -2 if found at invalid pos.
  */
-int find_list_sep(token_arr* arr, const char* cmdline) {
+int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
     int group_weight    = 0;
     int idx             = 0;
     bool found          = 0;
     token_cat tc;
-    char* ptr           = cmdline;
+    char* ptr           = (char*)cmdline;
 
     if (arr->occupied <= 1) return -1;
 
     // Search for an open separator.
-    while(arr->ptr[idx].type != TOK_EOL) {
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
         tc = get_category(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
-        if (!group_weight && tc == TC_SEP) {found=1;break;}
+        if (!group_weight && tc == TC_SEP 
+            && (!__only_semicolon || arr->ptr[idx].type == TOK_SEMI)) 
+            {found=1;break;}
         idx++;
     }
 
     if (!found) return -1;
 
     // grammar rule: no {&&, ||, ;} at the begining or end of line
-    if (idx == 0 || idx >= arr->occupied-2) {
-        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx));
-        g_abort_ast = 1;
-        return -2;
+    if (arr->ptr[idx].type != TOK_SEMI) {
+        if (idx == 0 || idx >= (int)arr->occupied-2) {
+            error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
+            g_abort_ast = 1;
+            return -2;
+        }
     }
     return idx;
 }
@@ -260,15 +264,15 @@ int find_pipe(token_arr* arr, const char* cmdline) {
     int idx             = 0;
     bool found          = 0;
     token_cat tc;
-    char* ptr           = cmdline;
+    char* ptr           = (char*)cmdline;
 
     if (arr->occupied <= 1) return -1;
 
     // Not the time if there are list separators.
-    if (find_list_sep(arr, cmdline) >= 0) return -1;
+    if (find_list_sep(arr, cmdline, 0) >= 0) return -1;
 
     // Search for an open pipe token
-    while(arr->ptr[idx].type != TOK_EOL) {
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
         tc = get_category(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
@@ -281,11 +285,146 @@ int find_pipe(token_arr* arr, const char* cmdline) {
     if(!found) return -1;
 
     // grammar rule: no | at the begining or end of line
-    if (idx == 0 || idx >= arr->occupied-1) {
-        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx));
+    if (idx == 0 || idx >= (int)arr->occupied-1) {
+        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
         g_abort_ast = 1;
         return -2;
     }
+    return idx;
+}
+
+/**
+ * @brief find redirections in token array.
+ * @param n_redirs number of redirections found in token array.
+ * @return idx of first redirection in the token array provided.
+ *      -1 not found,  -2 found at invalid pos.
+ */
+int find_redirs(token_arr* arr, const char* cmdline, _out_ int* n_redirs) {
+    int group_weight    = 0;
+    int idx             = 0;
+    *n_redirs           = 0;
+    int f; (void)f; 
+    int first           = -1;
+    bool found          = 0;
+    token_cat tc;
+    char* ptr           = (char*)cmdline;
+
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
+        tc = get_category(arr->ptr[idx].type);
+        if (tc == TC_GROUP_START)group_weight++;
+        if (tc == TC_GROUP_END)group_weight--;
+        if (tc == TC_CMD_SUB_START)group_weight++;
+        if (tc == TC_CMD_SUB_END)group_weight--;
+        if (tc == TC_REDIR) {
+            if (first == -1) first = idx;
+                    //Make the compiler happy
+            f = (*n_redirs)++;(void)f;
+            found = 1;
+        }
+        idx++;
+    }
+
+    if (!found) return -1;
+
+    // Only grammar enforcing that we can do here is
+    // Error when fisrt redir is at last pos of the array.
+    // grammar rule: redirections need at least another token at the left.
+    if (arr->ptr[first+1].type == TOK_EOL || first >= (int)arr->occupied - 1) {
+        error_parse(ERR_UNEXP, ptr + arr->ptr[first].str_idx-1);
+        error_parse(ERR_EXP, "expected fd, filename, string or heredoc delimiter.");
+        g_abort_ast = 1;
+        return -2;
+    }
+    return first;
+}
+
+/**
+ * @brief find redirections in token array.
+ */
+int find_cmd_sub(token_arr* arr) {
+    int group_weight    = 0;
+    int idx             = 0;
+    bool found          = 0;
+    token_cat tc;
+
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
+        tc = get_category(arr->ptr[idx].type);
+        if (tc == TC_GROUP_START)group_weight++;
+        if (tc == TC_GROUP_END)group_weight--;
+        if (tc == TC_CMD_SUB_START) {found=1; break;}
+        idx++;
+    }
+    if (!found) {return -1;}
+
+    return idx;
+}
+
+/**
+ * @brief locate a binary in the disk through $PATH env var.
+ * resulting string need to be freed.
+ * returns NULL if non-existant.
+ */
+char* find_binary_path(const char* name) {
+    const char* path_env    = NULL;
+    char* path              = NULL;
+    char* saveptr           = NULL;
+    char* dir               = NULL;
+    char* full              = NULL;
+    size_t needed           = 0;
+    size_t len_dir          = 0;
+    size_t len_name         = 0;
+    
+
+    if (!name || !*name)
+        return NULL;
+
+    // If the name already contains a '/', treat it literally.
+    if (strchr(name, '/')) {
+        if (access(name, X_OK) == 0)
+            return strdup(name);
+        return NULL;
+    }
+
+    path_env = getenv("PATH");
+    if (!path_env)
+        return NULL;
+
+    // Duplicate PATH because strtok modifies it
+    path = strdup(path_env);
+    if (!path)
+        return NULL;
+
+    dir = strtok_r(path, ":", &saveptr);
+
+    while (dir) {
+        len_dir = strlen(dir);
+        len_name = strlen(name);
+
+        // Allocate buffer for: dir + '/' + name + '\0'
+        needed = len_dir + 1 + len_name + 1;
+        full = malloc(needed);
+        if (!full) {
+            free(path);
+            return NULL;
+        }
+
+        // dir/name
+        strcpy(full, dir);
+        full[len_dir] = '/';
+        strcpy(full + len_dir + 1, name);
+
+        // if exec.
+        if (access(full, X_OK) == 0) {
+            free(path);
+            return full;
+        }
+
+        free(full);
+        dir = strtok_r(NULL, ":", &saveptr);
+    }
+
+    free(path);
+    return NULL;
 }
 
 bool type_in_list(typeof_token t, typeof_token* l, size_t sz) {
