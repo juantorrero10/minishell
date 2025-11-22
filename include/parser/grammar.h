@@ -49,9 +49,10 @@ typedef enum {
     TC_SEP,
     TC_BG,
     TC_REDIR,
-    TC_RD_ST,   // redir settings
+    TC_RD_ST,   // redir settings (fd)
     TC_DQ_START,
-    TC_DQ_END
+    TC_DQ_END,
+    TC_ERROR
 }token_cat;
 
 typedef struct _token_generic_type{
@@ -105,7 +106,7 @@ typedef struct {
 
 typedef struct {
     char **argv;                    //NULL terminated
-    size_t argc;
+    int argc;
     char* filename;                 //NULL if internal or non-existent
     ast_node_redir_t* redirs;       // Array of redirections
     size_t nredirs;                 // N of redirs
@@ -136,6 +137,10 @@ typedef struct {
     ast_t *right; 
 } ast_node_list_t;
 
+typedef struct {
+    ast_t* children;
+} ast_node_background_t;
+
 
 struct _ast_generic_type {
     ast_type_t type;
@@ -146,6 +151,7 @@ struct _ast_generic_type {
         ast_node_group_t grp;
         ast_node_substitution_t sub;
         ast_node_redir_t  redir;
+        ast_node_background_t bg;
     }node;
 };
 

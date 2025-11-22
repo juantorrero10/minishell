@@ -1,5 +1,11 @@
 #include <mshparser.h>
 
+/**
+ * .c file containing a main() for testing only the parser.
+ * this file will not be compiled anymore when developing
+ * of this submodule ends.
+ */
+
 int main(void)
 {
     char buff[1024];

@@ -103,11 +103,12 @@ static size_t isnum(const char* s) {
 
     buf = strndup(s, __restrict_view);
     sz = strlen(buf); sz2 = sz;
-    if (!isdigit(buf[0])) return 0;
+    if (!isdigit(buf[0])) {if (buf) free(buf); return 0;}
     //trim chars
     for (int i = ((int)sz)-1; i >= 0; i--){
         if (!isdigit(buf[i])) {buf[i] = '\0';sz2--;}
     }
+    if (buf) free(buf);
     return sz2;
 }
 
@@ -130,7 +131,7 @@ static char pile_pop(char* pile, int* pile_top) {
 /**
  * @brief tokenizer state machine:
  */
-token_arr tokenize(char *cmdline, _out_ int *st)
+token_arr __tokenize(char *cmdline, _out_ int *st)
 {
     scanner s;
     token_arr r = {NULL, 0, 0};

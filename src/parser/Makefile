@@ -5,15 +5,18 @@ CC = gcc
 DBG = gdb
 
 INC_DIR=../../include/parser
-LIB_DIR=lib
-OBJ_DIR=build/obj
-OBJ_THIS=build/obj/parser
-BIN_DIR=build/bin
-BIN_THIS=build/bin/parser
+LIB_DIR=../../lib
+OBJ_DIR=../../build/obj
+OBJ_THIS=../../build/obj/parser
+BIN_DIR=../../build/bin
+BIN_THIS=../../build/bin/parser
 SRC_DIR=.
 
-# archivos .c fuente
-SRC = ast.c testdemo.c parser.c errors.c heredoc.c tokenizer.c redir.c parser_utils.c scanner.c
+
+
+# archivos .c fuente, testdemo.c se eliminará una vez de acabe de desarrollar el parser.
+SRC = ast.c parser.c errors.c heredoc.c tokenizer.c redir.c parser_utils.c scanner.c
+DEMO_MAIN = testdemo
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
 # No libs
@@ -43,19 +46,23 @@ CYAN   = \033[0;96m
 RED    = \033[0;91m
 
 # --------------- TAREAS -------------------------
-all:$(BIN)
+all:$(OBJ)
 
-# Compilar (*.c -> *.o)
+# Compilar (*.c -> *.o) sin demo
 $(OBJ_THIS)/%.o : $(SRC_DIR)/%.c | $(OBJ_THIS)
 	@echo "$(PURPLE)--------------------------------------------------------------------------"
 	@echo "	Compiling: $(CYAN)$< $(PURPLE) -> $(RED) $@ $(WHITE)"
 	$(CC) $(CCFLAGS) -c $< -o $@
 
+# testear submodulo
+demo: $(OBJ) $(BIN)
+
 # Vincular (*.o -> binary)
 $(BIN) : $(OBJ) | $(BIN_THIS)
+	$(CC) $(CCFLAGS) -c $(SRC_DIR)/demo/$(DEMO_MAIN).c -o $(OBJ_THIS)/$(DEMO_MAIN).o
 	@echo "$(CYAN)--------------------------------------------------------------------------"
 	@echo "	Linking: $(RED)$< $(CYAN)-> $(GREEN)$@$(WHITE)"
-	$(CC) $(CCFLAGS) -o $@ $(OBJ)
+	$(CC) $(CCFLAGS) -o $@ $(OBJ) $(OBJ_DIR)/parser/$(DEMO_MAIN).o
 	@echo " "
 
 # Crear carpetas
@@ -78,5 +85,5 @@ clean:
 debug: all
 	$(DBG) ./$(BIN)
 
-.PHONY: all clean debug
+.PHONY: all clean debug demo
 

@@ -4,7 +4,7 @@
 #include <colors.h>
 
 #define ERR_LBL "syntax error"
-#define LPERR(MSG, ...) fprintf(stderr, COLOR_RED""ERR_LBL": "COLOR_RESET""MSG"\r\n", ##__VA_ARGS__);
+#define LPERR(MSG, ...) fprintf(stderr, STYLE_BOLD""COLOR_RED""ERR_LBL": "COLOR_RESET""MSG"\r\n", ##__VA_ARGS__);
 
 typedef enum {
     ERR_UNEXP,
