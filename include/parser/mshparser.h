@@ -1,7 +1,8 @@
 #ifndef PARSER_MSHPARSER_H_
 #define PARSER_MSHPARSER_H_
 
-#define _out_
+#define _out_   //Output pointer func param indicator
+#define _opt_   //Opcional pointer func param indicator
 
 #define _POSIX_C_SOURCE 200809L
 

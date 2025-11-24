@@ -1,10 +1,18 @@
 #include <mshparser.h>
-
+#include <../log.h>
 
 ast_t* ast_create_empty() {
     ast_t* ret = malloc(sizeof(ast_t));
     memset(ret, 0, sizeof(ast_t));
     ret->type = AST_INVALID; return ret;
+}
+
+ast_t* ast_create_array(size_t n_trees) {
+    INFO("n_trees");
+    ast_t* t = malloc(sizeof(ast_t) * n_trees);
+    memset(t, 0, sizeof(ast_t) * n_trees);
+    for (size_t i = 0; i < n_trees; i++) t[i].type = AST_INVALID;
+    return t;
 }
 
 static void ast_free_redir(ast_node_redir_t rd) {
@@ -43,11 +51,14 @@ static void ast_free_command(ast_node_command_t* c) {
 }
 
 static void ast_free_pipeline(ast_node_pipeline_t* ppl) {
+    ast_t* elem; (void) elem;
+
     for (size_t i = 0; i < ppl->ncommands; i++)
     {
+        elem = ppl->elements + i;
         ast_free(ppl->elements + i);
-        free(ppl->elements + i);
     }
+    free(ppl->elements);
 }
 
 void ast_free(ast_t* t) {

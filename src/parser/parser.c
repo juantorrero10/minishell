@@ -3,7 +3,7 @@
 int g_abort_ast = 0;
 
 // forward declaration.
-static ast_t* parse_line(token_arr* arr, const char* cmdline);
+static ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at);
 
 /**
  * @brief parse one command. 
@@ -15,9 +15,9 @@ static ast_t* parse_line(token_arr* arr, const char* cmdline);
  * @todo: command substitutions.
  * @todo: redirections.
  */
-static ast_t* parse_simple_command(token_arr* arr, const char* cmdline) {
+static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
     ast_node_command_t cmd = (ast_node_command_t){0};
-    ast_t* ret      = ast_create_empty();
+    ast_t* ret      = NULL;
     int idx         = 0;
     int idx_redir   = 0; (void)idx_redir;
     int idx_cmdsub  = 0;
@@ -25,6 +25,9 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline) {
     int argc        = 0;
     char* ptr       = (char*) cmdline;
     token_arr view;
+
+    if (!locate_at) ret = ast_create_empty();
+    else ret = (ast_t*)locate_at;
 
     idx_redir = find_redirs(arr, cmdline, &nredirs);
     if (g_abort_ast) {ast_free(ret); return NULL;}
@@ -112,8 +115,8 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
     sep.sep_type = arr->ptr[idx].type;
     view_left = make_arr_view(arr, 0, idx - 1);
     view_right = make_arr_view(arr, idx+1, arr->occupied - 1);
-    sep.left = parse_line(&view_left, cmdline);
-    sep.right = parse_line(&view_right, cmdline);
+    sep.left = parse_line(&view_left, cmdline, NULL);
+    sep.right = parse_line(&view_right, cmdline, NULL);
     ret->node.sep = sep;
     return ret;
 }
@@ -162,7 +165,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     }
 
     idx = 0;
-    ppl.elements = malloc(sizeof(ast_t) * (n_pipes + 1));
+    ppl.elements = ast_create_array(n_pipes + 1);
     while (idx <= ppl_end) {
         if (arr->ptr[idx].type == TOK_CMD_ST_START) cmd_sub++;
         if (arr->ptr[idx].type == TOK_CMD_ST_END) cmd_sub--;
@@ -173,13 +176,12 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
             if (idx == ppl_end) cmd_end++;
             view = make_arr_view(arr, cmd_st, cmd_end);
             // Only allowing simple commands in pipelines.
-            temp = parse_line(&view, cmdline);
+            temp = parse_line(&view, cmdline, (ppl.elements + ppl.ncommands++));
             if (g_abort_ast || !temp) {
                 if (ppl.elements)free(ppl.elements);
                 goto abort_ppl;
 
             }
-            ppl.elements[ppl.ncommands++] = *temp;
             cmd_st = idx + 1;
             cmd_end = cmd_st;
         }
@@ -203,7 +205,7 @@ abort_ppl:
  * its cascades down from more complex to more simple.
  * @note operates under assumption of a well tokenized and balanced input.
  */
-ast_t* parse_line(token_arr* arr, const char* cmdline) {
+ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
     // HIGHER LEVEL
     // 0. background flag
     // 1. parse_list
@@ -227,7 +229,7 @@ ast_t* parse_line(token_arr* arr, const char* cmdline) {
         ret = ast_create_empty();
         ret->type = AST_BG;
         view = make_arr_view(arr, 0, arr->occupied-3);
-        bg.children = parse_line(&view, cmdline);
+        bg.children = parse_line(&view, cmdline, locate_at);
         ret->node.bg = bg; return ret;
     }
 
@@ -245,7 +247,7 @@ ast_t* parse_line(token_arr* arr, const char* cmdline) {
 
     //TODO: groups.
 
-    return parse_simple_command(arr, cmdline);
+    return parse_simple_command(arr, cmdline, locate_at);
 
 }
 
@@ -273,7 +275,7 @@ ast_t* parse_command(char* cmdline) {
     if (sz) goto clean_exit;
     pu_peek(&arr);
 
-    result = parse_line(&arr, cmdline);
+    result = parse_line(&arr, cmdline, NULL);
     if (result) {
         ast_free(result); 
         free(result);
