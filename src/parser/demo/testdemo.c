@@ -19,7 +19,7 @@ int main(void)
         sz = strlen(buff);
         if (buff[sz - 1] == '\n') buff[sz-- - 1] = '\0';
         if (!strcmp("exit", buff)) exit(0);
-        a = parse_command(buff);
+        a = parse_string(buff);
     }
     return (0);
 }

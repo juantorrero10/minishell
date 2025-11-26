@@ -1,0 +1,5 @@
+echo "findings: $(find / -type f | grep "null")" 
+echo "$(echo "nested $(echo deep)")"
+echo "a $(echo $(id)) c"
+exit
+

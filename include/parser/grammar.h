@@ -89,7 +89,8 @@ typedef enum {
     REDIR_FILE,     // > file, < file
     REDIR_FD,       // >&1, <&3
     REDIR_HEREDOC,  // <<EOF
-    REDIR_HERESTR   // <<< "string"
+    REDIR_HERESTR,  // <<< "string"
+    REDIR_CLOSE
 } redir_target_t;
 
 typedef struct {

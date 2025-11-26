@@ -38,7 +38,7 @@ const char* str_tok(typeof_token tt, char buff[])
         /* FD-prefix tokens */
         case TOK_REDIR_RHS_FD:         strcpy(buff, "FD_RHS"); break;
         case TOK_REDIR_LHS_FD:          strcpy(buff, "FD_LHS"); break;
-        case TOK_REDIR_RHS_CLOSE:          strcpy(buff, "-"); break;
+        case TOK_REDIR_RHS_CLOSE:          strcpy(buff, "FD_CLOSE"); break;
 
         /* misc */
         case TOK_EOL:                  strcpy(buff, "EOL"); break;
@@ -144,7 +144,11 @@ int pu_check_balance(char* cmdline, size_t view) {
         goto done;
     }
     if (top != 0) {
+        if (stack[top-1] == '(') {
         error_parse(ERR_UNTERM_PAREN, NULL);
+        } else {
+            error_parse(ERR_UNTERM_BRACKET, NULL);
+        }
         ret = 1;
         goto done;
     }
@@ -200,6 +204,12 @@ token_cat get_category(typeof_token tt) {
 }
 
 /**
+ * @brief make a view of an array.
+ * @example for (arr, 0, 2).
+ *      arr = {a, b, c, d, EOL} .allocated = 5 .occupied = 5
+ *             ^     ^
+ *             S     E
+ *   result = {a, b, c}         .allocated = 5 .occupied = 3 
  * @param start zero indexed
  * @param end   zero indexed
  */
@@ -245,7 +255,7 @@ int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
 
     if (!found) return -1;
 
-    // grammar rule: no {&&, ||, ;} at the begining or end of line
+    // grammar rule: no {&&, ||} at the begining or end of element
     if (arr->ptr[idx].type != TOK_SEMI) {
         if (idx == 0 || idx >= (int)arr->occupied-2) {
             error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
@@ -284,7 +294,7 @@ int find_pipe(token_arr* arr, const char* cmdline) {
 
     if(!found) return -1;
 
-    // grammar rule: no | at the begining or end of line
+    // grammar rule: no | at the begining or end of element
     if (idx == 0 || idx >= (int)arr->occupied-1) {
         error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
         g_abort_ast = 1;
@@ -315,13 +325,14 @@ int find_redirs(token_arr* arr, const char* cmdline, _out_ int* n_redirs) {
         if (tc == TC_GROUP_END)group_weight--;
         if (tc == TC_CMD_SUB_START)group_weight++;
         if (tc == TC_CMD_SUB_END)group_weight--;
-        if (tc == TC_REDIR) {
+        if ((tc == TC_REDIR || tc == TC_RD_ST) && !group_weight) {
             if (first == -1) first = idx;
                     //Make the compiler happy
+            if (tc == TC_RD_ST) idx = idx+3;
+            else if (tc == TC_REDIR) idx = idx+2;
             f = (*n_redirs)++;(void)f;
             found = 1;
-        }
-        idx++;
+        } else idx++;
     }
 
     if (!found) return -1;
@@ -434,4 +445,48 @@ bool type_in_list(typeof_token t, typeof_token* l, size_t sz) {
     }
     return false;
     
+}
+
+/**
+ * Search for a group.
+ * true if arr given -> ( ... ) [<redirs>]
+ *                   or { ... } [<redirs>]
+ * false if command. (word)
+ * aborts AST if anything else
+ */
+bool is_a_group(token_arr* arr, const char* cmdline) {
+    token_cat tc = 0;
+    char* ptr = (char*)cmdline; //Make the compiler happy
+
+    tc = get_category(arr->ptr[0].type);
+
+    if (tc == TC_GROUP_START) {
+        return true;
+    }
+    else if (tc == TC_WORD) {
+        return false;
+    }
+
+    //Grammar rule:
+    //  list elements or whole lines start with word or group opening.
+    else  {
+        error_parse(ERR_UNEXP, ptr + arr->ptr[0].str_idx);
+        error_parse(ERR_EXP, "Expected a command or a group/subshell.");
+        g_abort_ast = 1;
+        return false;
+    }
+    
+}
+
+int redir_default_fd(typeof_token rd) {
+    if (get_category(rd) != TC_REDIR) return -1;
+    switch (rd)
+    {
+    case TOK_REDIR_OUT:
+    case TOK_REDIR_OUT_APPEND:
+    case TOK_REDIR_DUP_OUT:
+        return 1;
+    default:
+        return 0;
+    }
 }

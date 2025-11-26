@@ -42,10 +42,6 @@ run_parser() {
     ./build/bin/parser/parserdemo
 }
 
-run_minishell() {
-    ./build/bin/minishell
-}
-
 # ---- Dispatch ----
 cmd="$1"
 shift || true

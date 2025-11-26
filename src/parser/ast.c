@@ -16,9 +16,9 @@ ast_t* ast_create_array(size_t n_trees) {
 }
 
 static void ast_free_redir(ast_node_redir_t rd) {
-    if (rd.target.filename) free(rd.target.filename);
-    if (rd.target.string)   free(rd.target.string);
-    if (rd.target.delimiter)     free(rd.target.delimiter);
+    if (rd.kind != REDIR_FD && rd.kind != REDIR_CLOSE) {
+        if (rd.target.filename) free(rd.target.filename);
+    }
 }
 
 static void ast_free_command(ast_node_command_t* c) {
@@ -30,8 +30,6 @@ static void ast_free_command(ast_node_command_t* c) {
                 c->argv[i] = NULL;
             }
         }
-        // free null termination
-        free(c->argv[c->argc]);
         free(c->argv);
         c->argv = NULL;
     }
@@ -87,6 +85,9 @@ void ast_free(ast_t* t) {
         }
         if (t->node.grp.redirs) {
             // free array of redirs if allocated (adjust per your definitions)
+            for (size_t i = 0; i < t->node.grp.nredirs; i++)
+                ast_free_redir(t->node.grp.redirs[i]);
+            
             free(t->node.grp.redirs);
             t->node.grp.redirs = NULL;
             t->node.grp.nredirs = 0;
@@ -104,5 +105,4 @@ void ast_free(ast_t* t) {
     default:
         break;
     }
-
 }

@@ -3,8 +3,11 @@
 
 #define _out_   //Output pointer func param indicator
 #define _opt_   //Opcional pointer func param indicator
+#define _in_out_
 
 #define _POSIX_C_SOURCE 200809L
+
+#define __DEBUG
 
 //Main header for mshparser module
 #include <stdio.h>
