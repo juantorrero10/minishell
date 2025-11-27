@@ -482,6 +482,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
 
             }
             memcpy(ppl.elements + ppl.ncommands++, temp, sizeof(ast_t));
+            free(temp);
             cmd_st = idx + 1;
             cmd_end = cmd_st;
         }

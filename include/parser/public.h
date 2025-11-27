@@ -156,5 +156,6 @@ struct _ast_generic_type {
 };
 
 ast_t* parse_string(char* cmdline);
+void ast_free(ast_t* a);
 
 #endif // PARSER_PUBLIC_H_

@@ -66,6 +66,7 @@ void ast_free(ast_t* t) {
     case AST_BG:
         if (t->node.bg.children) {
             ast_free(t->node.bg.children);
+            free(t->node.bg.children);
         }
         break;
     case AST_COMMAND:
@@ -81,6 +82,7 @@ void ast_free(ast_t* t) {
     case AST_SUBSHELL:
         if (t->node.grp.children) {
             ast_free(t->node.grp.children);
+            free(t->node.grp.children);
             /* don't free t->node.grp.children pointer here — caller will if it's a heap ptr */
         }
         if (t->node.grp.redirs) {
@@ -96,6 +98,7 @@ void ast_free(ast_t* t) {
     case AST_SUBST:
         if (t->node.sub.children) {
             ast_free(t->node.sub.children);
+            free(t->node.sub.children);
         }
         break;
     case AST_LIST:

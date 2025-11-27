@@ -1,6 +1,8 @@
 #include <minishell.h>
 #include <log.h>
 
+#include <parser/public.h>
+
 /**
  * Esta funcion, solo se encarga de liberar las copias, 
  * no el que se crea con tokenize() porque la libreria ya se encarga de él.
@@ -155,6 +157,8 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
 
         // tokenizar
         line = tokenize(buff);
+        ast_t* a = parse_string(buff);
+        ast_free(a);
         if (line != NULL) {
 
             // expandir variables de entorno y juntar argumentos entre comillas
