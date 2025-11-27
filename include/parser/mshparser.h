@@ -7,8 +7,6 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#define __DEBUG
-
 //Main header for mshparser module
 #include <stdio.h>
 #include <stdlib.h>

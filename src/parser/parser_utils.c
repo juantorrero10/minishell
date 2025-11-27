@@ -3,7 +3,7 @@
 #include <../log.h>
 
 // returns buff for convenience
-const char* str_tok(typeof_token tt, char buff[])
+char* str_tok(typeof_token tt, char buff[])
 {
     switch (tt) {
         case TOK_WORD:                 strcpy(buff, "WORD"); break;
@@ -489,4 +489,32 @@ int redir_default_fd(typeof_token rd) {
     default:
         return 0;
     }
+}
+
+/**
+ * @brief Extract a word from a series of tokens.
+ */
+void get_word(token_arr* arr, int idx, char** output) {
+    token_arr view = make_arr_view(arr, idx, __INT32_MAX__);
+    token_arr* pview = &view;
+    int i = 0;
+
+    if (tok_type(pview, 0) == TOK_WORD) {
+        *output = strdup(view.ptr[0].value);
+    } // IF word is "", check for cmd subs
+    else if (tok_type(pview, 0) == TOK_DQ_START) {
+        while(tok_type(pview, i+1) != TOK_DQ_END) {
+            i++;
+            // Not allowed for now
+            if (tok_type(pview, i) == TOK_CMD_ST_START) {
+                error_parse(-1, "cmd substitutions are now allowed for now.");
+                return;
+            }
+        }
+        *output = strdup(view.ptr[i].value);
+    } else if (tok_type(pview, 0) == TOK_CMD_ST_START) {
+        error_parse(-1, "cmd substitutions are now allowed for now.");
+        return;
+    }
+
 }

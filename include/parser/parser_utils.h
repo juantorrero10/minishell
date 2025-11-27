@@ -4,7 +4,7 @@
 
 // Unordered sort of helper functions.
 
-
+char* str_tok(typeof_token tt, char buff[]);
 void pu_peek(token_arr* arr);
 int pu_check_balance(char* cmdline, size_t view);
 token_cat get_category(typeof_token tt);
@@ -17,5 +17,7 @@ char* find_binary_path(const char* name);
 bool is_a_group(token_arr* arr, const char* cmdline);
 bool type_in_list(typeof_token t, typeof_token* l, size_t sz);
 int redir_default_fd(typeof_token rd);
+void get_word(token_arr* arr, int idx, char** output);
+
 
 #endif // PARSER_PARSER_UTILS_H_

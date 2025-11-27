@@ -3,6 +3,7 @@
 
 int g_abort_ast = 0;
 
+
 // forward declaration.
 static ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at);
 
@@ -20,6 +21,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
     int curr     = 0;
     int nredirs  = 0;
     int idx      = 0;
+    int rd_idx   = 0;
     int end_last = 0;
     bool last    = 0;
     typeof_token bef, aft; (void)bef; (void)aft;
@@ -65,14 +67,28 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
         case TOK_REDIR_OUT:
             //Grammar check
             if (last) error_parse(ERR_EXP, "Expected a filename.");
-            if ((idx > end_last && tok_type(arr, idx-1) != TOK_REDIR_LHS_FD) ||
-                tok_type(arr, idx+1)  != TOK_WORD) {
+            if ((idx > end_last && tok_type(arr, idx-1) != TOK_REDIR_LHS_FD) || (
+                tok_type(arr, idx+1)  != TOK_WORD && 
+                tok_type(arr, idx+1) != TOK_DQ_START && 
+                tok_type(arr, idx+1) != TOK_CMD_ST_START)) {
                     error_parse(ERR_INVALID_REDIR_SYNTAX, ptr + strloc(arr, idx-1));
                     goto __redir_abort;
                 }
-            //Default value
+            
+            rd_idx = idx;
             curr_rd->kind = REDIR_FILE;
-            curr_rd->target.filename = strdup(arr->ptr[idx+1].value);
+            get_word(arr, idx+1, &curr_rd->target.filename);
+            //Skip until end of quotes
+            if (tok_type(arr, idx+1) == TOK_DQ_START) {
+                while(tok_type(arr, idx+1) != TOK_DQ_END) {
+                    idx++;
+                } 
+            }
+            if (tok_type(arr, idx+1) == TOK_CMD_ST_START) {
+                while(tok_type(arr, idx+1) != TOK_CMD_ST_END) {
+                    idx++;
+                } 
+            }
             break;
 
         case TOK_REDIR_DUP_IN:
@@ -88,6 +104,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
             if (tok_type(arr, idx+1) == TOK_REDIR_RHS_CLOSE) {
                 curr_rd->kind = REDIR_CLOSE; break;
             }
+            rd_idx = idx;
             curr_rd->kind = REDIR_FD;
             curr_rd->target.fd = arr->ptr[idx+1].number;
             break;
@@ -97,25 +114,39 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
             //Grammar check
             if (last) error_parse(ERR_EXP, "Expected a string.");
             if ((idx > end_last &&
-                tok_type(arr, idx-1) != TOK_REDIR_LHS_FD) ||
-                tok_type(arr, idx+1) != TOK_WORD) {
+                tok_type(arr, idx-1) != TOK_REDIR_LHS_FD) || (
+                tok_type(arr, idx+1)  != TOK_WORD && 
+                tok_type(arr, idx+1) != TOK_DQ_START && 
+                tok_type(arr, idx+1) != TOK_CMD_ST_START)) {
                     error_parse(ERR_INVALID_REDIR_SYNTAX, ptr + strloc(arr, idx-1));
                     goto __redir_abort;
                 }
+            rd_idx = idx;
             if (tok_type(arr, idx) == TOK_REDIR_HEREDOC)
                 curr_rd->kind = REDIR_HEREDOC;
             else curr_rd->kind = REDIR_HERESTR;
-            curr_rd->target.string = strdup(arr->ptr[idx+1].value);
+            get_word(arr, idx+1, &curr_rd->target.filename);
+            //Skip until end of quotes
+            if (tok_type(arr, idx+1) == TOK_DQ_START) {
+                while(tok_type(arr, idx+1) != TOK_DQ_END) {
+                    idx++;
+                } 
+            }
+            if (tok_type(arr, idx+1) == TOK_CMD_ST_START) {
+                while(tok_type(arr, idx+1) != TOK_CMD_ST_END) {
+                    idx++;
+                } 
+            } break;
 
         default:
             break;
         }
 
         // finish current node and go to next one
-        if (idx <= end_last)
-            curr_rd->left_fd = redir_default_fd(tok_type(arr, idx)); //default val
-        else curr_rd->left_fd = arr->ptr[idx-1].number;                
-        curr_rd->op = tok_type(arr, idx);
+        if (rd_idx <= end_last)
+            curr_rd->left_fd = redir_default_fd(tok_type(arr, rd_idx)); //default val
+        else curr_rd->left_fd = arr->ptr[rd_idx-1].number;                
+        curr_rd->op = tok_type(arr, rd_idx);
         idx = idx + 2;
         end_last = idx;
 
@@ -293,7 +324,9 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
 
     //Get group end
     //By this point is guaranteed to have a closing token.
-    while (get_category(arr->ptr[idx++].type) != TC_GROUP_END);
+    idx = arr->occupied - 1;
+    while (get_category(tok_type(arr, idx)) != TC_GROUP_END && idx >= 0) idx--;
+    idx++;
     
 
     // Grammar rule: {} groups need to have a ; before the closing }.
@@ -513,7 +546,7 @@ ast_t* parse_string(char* cmdline) {
     int sz = 0;
     token_arr arr = {NULL, 0, 0}; (void)arr;
     char* trim_chars = "\t\r\n ";
-    ast_t* result;
+    ast_t* result = NULL;
 
     sz = strlen(cmdline);
     INFO("received: %s", cmdline);
@@ -533,20 +566,11 @@ ast_t* parse_string(char* cmdline) {
     pu_peek(&arr);
 
     result = parse_line(&arr, cmdline, NULL);
-    if (result) {
-        ast_free(result); 
-        free(result);
-    } else {WARN("parser aborted");}
+    if (!result) {
+        WARN("parser aborted");
+    }
 
 clean_exit:
     free_token_arr(&arr);
-    return NULL;
+    return result;
 }
-
-/*
-
-static ast_t* parse_pipeline();
-static ast_t* parse_simple_command();
-static ast_t* parse_redirection(ast_t*);
-
-*/

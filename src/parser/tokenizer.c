@@ -37,11 +37,36 @@ static int chrcount(char *s, char c, int __restrict_view) {
 /** 
  * @brief Copy a word into a token given a view of an array
  * single or double quotes are dissmised.
+ * 
  * */
 static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     token_t ret = { .type = TOK_WORD, .number = 0, .value = NULL };
+    bool squote_last;
+    size_t len = we - ws + 1;
+    size_t sz;
 
+    // Bounds check
+    if (we < ws)
+        return ret;
+
+   
+
+    // Trim front spaces
+    for (size_t i = 0; i < len; i++)
+    {
+        if (cmdline[ws + i] == ' ') ws++;
+        else break;
+    }
+
+    // trim single quotes
+    if (cmdline[ws] == '\'') {
+        ws++;
+        squote_last = 1;
+    }
+    
     ret.value = strndup(cmdline + ws, we - ws);
+    sz = strlen(ret.value);
+    if (ret.value[sz-1] == '\'' && squote_last) {ret.value[sz-- - 1] = 0;}
     ret.str_idx = ws;
     return ret;
 }
@@ -170,7 +195,6 @@ token_arr __tokenize(char *cmdline, _out_ int *st)
     memset(pile, 0, 100);
 
 init:
-    after_redir = 0;
     curr = (token_t){ .type = TOK_ERROR, .number = 0, .value = NULL };
     curr.str_idx = word_start;
     word_start = s.i;
@@ -178,6 +202,7 @@ init:
     tt = TOK_WORD;
 
 word:
+    after_redir = 0;
     // ' everything is allowed and its not expanded
     if (squoted) {
         if (s.curr == '\'' && !cmd_sub) {
@@ -199,6 +224,7 @@ word:
     // detect redirections
     
     if ((curr.type = scan_redir_type(s.buf + s.i, &curr.number)) != TOK_ERROR) {
+        if (word_end > word_start) goto finish_word;
         scanner_adv(&s, curr.number); curr.number = 0;
         curr.str_idx = word_start;
         push_token(&r, &curr);

@@ -16,6 +16,7 @@ SRC_DIR=.
 
 # archivos .c fuente, testdemo.c se eliminará una vez de acabe de desarrollar el parser.
 SRC = ast.c parser.c errors.c heredoc.c tokenizer.c redir.c parser_utils.c scanner.c
+TEST = test_ast
 DEMO_MAIN = testdemo
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
@@ -60,9 +61,10 @@ demo: $(OBJ) $(BIN)
 # Vincular (*.o -> binary)
 $(BIN) : $(OBJ) | $(BIN_THIS)
 	$(CC) $(CCFLAGS) -c $(SRC_DIR)/demo/$(DEMO_MAIN).c -o $(OBJ_THIS)/$(DEMO_MAIN).o
+	$(CC) $(CCFLAGS) -c $(SRC_DIR)/test/$(TEST).c -o $(OBJ_THIS)/$(TEST).o
 	@echo "$(CYAN)--------------------------------------------------------------------------"
 	@echo "	Linking: $(RED)$< $(CYAN)-> $(GREEN)$@$(WHITE)"
-	$(CC) $(CCFLAGS) -o $@ $(OBJ) $(OBJ_DIR)/parser/$(DEMO_MAIN).o
+	$(CC) $(CCFLAGS) -o $@ $(OBJ) $(OBJ_DIR)/parser/$(DEMO_MAIN).o $(OBJ_DIR)/parser/$(TEST).o
 	@echo " "
 
 # Crear carpetas
