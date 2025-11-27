@@ -44,6 +44,8 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     bool squote_last;
     size_t len = we - ws + 1;
     size_t sz;
+    size_t cws = ws;
+    char* temp = cmdline + ws; (void)temp;
 
     // Bounds check
     if (we < ws)
@@ -54,7 +56,7 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     // Trim front spaces
     for (size_t i = 0; i < len; i++)
     {
-        if (cmdline[ws + i] == ' ') ws++;
+        if (cmdline[cws + i] == ' ') ws++;
         else break;
     }
 
@@ -311,6 +313,12 @@ word:
             }
         }
         if (dquoted && dollar)dq_weight++;
+
+        else if (dquoted) {
+            scanner_next(&s);
+            word_end = s.i;
+            goto word;
+        }
 
         curr = (token_t){0};
         pc = 'S';

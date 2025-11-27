@@ -1,0 +1,202 @@
+{ echo a 3>&1 >&2; echo b >&2 ; } 2> /dev/null &
+bg:
+children:
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 2
+redirs:
+fd=3 op='>&' dup-to-fd=1
+fd=1 op='>&' dup-to-fd=2
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 1
+redirs:
+fd=1 op='>&' dup-to-fd=2
+nredirs: 1
+redirs:
+fd=2 op='>' file="/dev/null"
+--END--
+ls -l | grep txt > results
+asts:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'ls -l'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'grep txt'
+nredirs: 1
+redirs:
+fd=1 op='>' file="results"
+--END--
+{ echo a; echo b; }
+asts:
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 0
+nredirs: 0
+--END--
+( cat input | sort ) >> sorted.txt
+asts:
+group:
+type: SUBSHELL
+children:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 0
+2/2:
+cmd:
+argc: 1
+argv: 'sort'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>>' file="sorted.txt"
+--END--
+echo a && echo b >log
+asts:
+sep: '&&'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 1
+redirs:
+fd=1 op='>' file="log"
+--END--
+cat < in.txt | wc -l
+asts:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 1
+redirs:
+fd=0 op'<' file="in.txt"
+2/2:
+cmd:
+argc: 2
+argv: 'wc -l'
+nredirs: 0
+--END--
+grep foo file 2>/dev/null
+asts:
+cmd:
+argc: 2
+argv: 'grep foo'
+nredirs: 1
+redirs:
+fd=2 op='>' file="/dev/null"
+--END--
+{ ls | wc -l; echo done; } >out.txt
+asts:
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'ls'
+nredirs: 0
+2/2:
+cmd:
+argc: 1
+argv: 'wc -l'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo done'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="out.txt"
+--END--
+echo start; ( echo inner | tr a-z A-Z ) >>log
+asts:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo start'
+nredirs: 0
+right:
+group:
+type: SUBSHELL
+children:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'echo inner'
+nredirs: 0
+2/2:
+cmd:
+argc: 3
+argv: 'tr a-z A-Z'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>>' file="log"
+--END--
+echo one | echo two | echo three >final
+asts:
+pipeline:
+ncommands: 3
+1/3:
+cmd:
+argc: 2
+argv: 'echo one'
+nredirs: 0
+2/3:
+cmd:
+argc: 2
+argv: 'echo two'
+nredirs: 0
+3/3:
+cmd:
+argc: 2
+argv: 'echo three'
+nredirs: 1
+redirs:
+fd=1 op='>' file="final"
+--END--

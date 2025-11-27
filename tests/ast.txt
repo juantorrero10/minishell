@@ -1,0 +1,651 @@
+echo "hello world" > out.txt
+cmd:
+argc: 2
+argv: 'echo hello world'
+nredirs: 1
+fd=1 op'>' file='out.txt'
+--END--
+{ echo a 3>&1 >&2; echo b >&2 ; } 2> /dev/null &
+bg:
+children:
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 2
+redirs:
+fd=3 op='>&' dup-to-fd=1
+fd=1 op='>&' dup-to-fd=2
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 1
+redirs:
+fd=1 op='>&' dup-to-fd=2
+nredirs: 1
+redirs:
+fd=2 op='>' file="/dev/null"
+--END--
+(find / -type f | grep "null" | xargs du -b | sort -nr | head -n 2 > result.txt ) 2> /dev/null
+group:
+type: SUBSHELL
+children:
+pipeline:
+ncommands: 5
+1/5:
+cmd:
+argc: 4
+argv: 'find / -type f'
+nredirs: 0
+2/5:
+cmd:
+argc: 2
+argv: 'grep null'
+nredirs: 0
+3/5:
+cmd:
+argc: 3
+argv: 'xargs du -b'
+nredirs: 0
+4/5:
+cmd:
+argc: 2
+argv: 'sort -nr'
+nredirs: 0
+5/5:
+cmd:
+argc: 3
+argv: 'head -n 2'
+nredirs: 1
+redirs:
+fd=1 op='>' file="result.txt"
+nredirs: 1
+redirs:
+fd=2 op='>' file="/dev/null"
+--END--
+echo a && echo b; echo c && echo d
+sep: ';'
+left:
+sep: '&&'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 0
+right:
+sep: '&&'
+left:
+cmd:
+argc: 2
+argv: 'echo c'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo d'
+nredirs: 0
+--END--
+ls -l | grep '.c$' > cs.txt
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'ls -l'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'grep .c$'
+nredirs: 1
+redirs:
+fd=1 op='>' file="cs.txt"
+--END--
+cat <<EOF
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 1
+redirs:
+fd=0 op='<<' heredoc delimiter="EOF"
+--END--
+printf "%s\n" "a b c" 1>&2
+cmd:
+argc: 3
+argv: 'printf %s\n a b c'
+nredirs: 1
+redirs:
+fd=1 op='>&' dup-to-fd=2
+--END--
+exec 3>>append.txt
+cmd:
+argc: 1
+argv: 'exec'
+nredirs: 1
+redirs:
+fd=3 op='>>' file="append.txt"
+--END--
+echo foo>"weird name.txt"
+cmd:
+argc: 2
+argv: 'echo foo'
+nredirs: 1
+redirs:
+fd=1 op='>' file="weird name.txt"
+--END--
+{ echo start; (echo nested) ; echo end; } > grp.out
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo start'
+nredirs: 0
+right:
+sep: ';'
+left:
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 2
+argv: 'echo nested'
+nredirs: 0
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo end'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="grp.out"
+--END--
+echo "a b" 'c d' > both.txt
+cmd:
+argc: 3
+argv: 'echo a b c d'
+nredirs: 1
+redirs:
+fd=1 op='>' file="both.txt"
+--END--
+echo hello > out1 2>&1
+cmd:
+argc: 2
+argv: 'echo hello'
+nredirs: 2
+redirs:
+fd=1 op='>' file="out1"
+fd=2 op='>&' dup-to-fd=1
+--END--
+sort < infile > outfile
+cmd:
+argc: 1
+argv: 'sort'
+nredirs: 2
+redirs:
+fd=0 op='<' file="infile"
+fd=1 op='>' file="outfile"
+--END--
+echo hi 3>err.log
+cmd:
+argc: 2
+argv: 'echo hi'
+nredirs: 1
+redirs:
+fd=3 op='>' file="err.log"
+--END--
+cat <<<"inline"
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 1
+redirs:
+fd=0 op='<<<' herestring="inline"
+--END--
+( true; false ) && echo ok
+sep: '&&'
+left:
+group:
+type: SUBSHELL
+children:
+sep: ';'
+left:
+cmd:
+argc: 1
+argv: 'true'
+nredirs: 0
+right:
+cmd:
+argc: 1
+argv: 'false'
+nredirs: 0
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo ok'
+nredirs: 0
+--END--
+echo a | echo b
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 0
+--END--
+exec 3<>/dev/tcp/example.com/80
+cmd:
+argc: 1
+argv: 'exec'
+nredirs: 1
+redirs:
+fd=3 op='<>' file="/dev/tcp/example.com/80"
+--END--
+echo "spaced name" > "out file.txt"
+cmd:
+argc: 2
+argv: 'echo spaced name'
+nredirs: 1
+redirs:
+fd=1 op='>' file="out file.txt"
+--END--
+grep -R "TODO" src > todos.txt 2>>errs.log
+cmd:
+argc: 4
+argv: 'grep -R TODO src'
+nredirs: 2
+redirs:
+fd=1 op='>' file="todos.txt"
+fd=2 op='>>' file="errs.log"
+--END--
+echo a ; echo b
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 0
+--END--
+find . -name "*.c" -print0 | xargs -0 du -b
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 5
+argv: 'find . -name *.c -print0'
+nredirs: 0
+2/2:
+cmd:
+argc: 4
+argv: 'xargs -0 du -b'
+nredirs: 0
+--END--
+{ printf "A\n"; printf "B\n"; } > letters.txt
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'printf A\n'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'printf B\n'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="letters.txt"
+--END--
+echo 'single "inside"' | sed 's/inside/OUT/'
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'echo single "inside"'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'sed s/inside/OUT/'
+nredirs: 0
+--END--
+command > out 2>&1 | cat
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'command'
+nredirs: 2
+redirs:
+fd=1 op='>' file="out"
+fd=2 op='>&' dup-to-fd=1
+2/2:
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 0
+--END--
+echo A >> append.log
+cmd:
+argc: 2
+argv: 'echo A'
+nredirs: 1
+redirs:
+fd=1 op='>>' file="append.log"
+--END--
+{ false; true; } || echo fallback
+sep: '||'
+left:
+group:
+type: GENERIC
+children:
+sep: ';'
+left:
+cmd:
+argc: 1
+argv: 'false'
+nredirs: 0
+right:
+cmd:
+argc: 1
+argv: 'true'
+nredirs: 0
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo fallback'
+nredirs: 0
+--END--
+( printf hi ) > /tmp/out
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 2
+argv: 'printf hi'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="/tmp/out"
+--END--
+echo "User: $USER" > u.txt
+cmd:
+argc: 2
+argv: 'echo User: $USER'
+nredirs: 1
+redirs:
+fd=1 op='>' file="u.txt"
+--END--
+echo hi 0>&-
+asts:
+cmd:
+argc: 2
+argv: 'echo hi'
+nredirs: 1
+redirs:
+fd=0 op='>&' close
+--END--
+echo "multi (paren) inside" | cat
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'echo multi (paren) inside'
+nredirs: 0
+2/2:
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 0
+--END--
+grep -E '^[0-9]+' file > nums
+cmd:
+argc: 4
+argv: 'grep -E ^[0-9]+ file'
+nredirs: 1
+redirs:
+fd=1 op='>' file="nums"
+--END--
+( echo a ) && ( echo b ) &
+bg:
+children:
+sep: '&&'
+left:
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 0
+nredirs: 0
+right:
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 2
+argv: 'echo b'
+nredirs: 0
+nredirs: 0
+--END--
+tr '\n' ' ' < infile > outfile
+cmd:
+argc: 3
+argv: 'tr \n  '
+nredirs: 2
+redirs:
+fd=0 op='<' file="infile"
+fd=1 op='>' file="outfile"
+--END--
+echo ok >/dev/null 2>&1
+cmd:
+argc: 2
+argv: 'echo ok'
+nredirs: 2
+redirs:
+fd=1 op='>' file="/dev/null"
+fd=2 op='>&' dup-to-fd=1
+--END--
+echo "$HOME" '$PATH' > mix.txt
+cmd:
+argc: 3
+argv: 'echo $HOME $PATH'
+nredirs: 1
+redirs:
+fd=1 op='>' file="mix.txt"
+--END--
+awk '{print $1}' data.txt | sort -u > uniq.txt
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 3
+argv: 'awk {print $1} data.txt'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'sort -u'
+nredirs: 1
+redirs:
+fd=1 op='>' file="uniq.txt"
+--END--
+yes | head -n 5 > five.txt
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'yes'
+nredirs: 0
+2/2:
+cmd:
+argc: 3
+argv: 'head -n 5'
+nredirs: 1
+redirs:
+fd=1 op='>' file="five.txt"
+--END--
+cat file1 file2 > merged && echo done
+sep: '&&'
+left:
+cmd:
+argc: 3
+argv: 'cat file1 file2'
+nredirs: 1
+redirs:
+fd=1 op='>' file="merged"
+right:
+cmd:
+argc: 2
+argv: 'echo done'
+nredirs: 0
+--END--
+command 5>&2 2>&1
+cmd:
+argc: 1
+argv: 'command'
+nredirs: 2
+redirs:
+fd=5 op='>&' dup-to-fd=2
+fd=2 op='>&' dup-to-fd=1
+--END--
+grep foo <<<"here" | sed 's/h/H/'
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'grep foo'
+nredirs: 1
+redirs:
+fd=0 op='<<<' herestring="here"
+2/2:
+cmd:
+argc: 2
+argv: 'sed s/h/H/'
+nredirs: 0
+--END--
+( seq 1 3 ) > numbers.txt
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 3
+argv: 'seq 1 3'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="numbers.txt"
+--END--
+echo done; ( false ) || echo recovered
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo done'
+nredirs: 0
+right:
+sep: '||'
+left:
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 1
+argv: 'false'
+nredirs: 0
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo recovered'
+nredirs: 0
+--END--
+tee out.txt <<DELIM
+cmd:
+argc: 2
+argv: 'tee out.txt'
+nredirs: 1
+redirs:
+fd=0 op='<<' heredoc delimiter="DELIM"
+--END--
+mv old new || echo mv_failed
+sep: '||'
+left:
+cmd:
+argc: 3
+argv: 'mv old new'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo mv_failed'
+nredirs: 0
+--END--
+sed -n '1,5p' file > head.txt 2> err
+cmd:
+argc: 4
+argv: 'sed -n 1,5p file'
+nredirs: 2
+redirs:
+fd=1 op='>' file="head.txt"
+fd=2 op='>' file="err"
+--END--
+echo final >&1
+cmd:
+argc: 2
+argv: 'echo final'
+nredirs: 1
+redirs:
+fd=1 op='>&' dup-to-fd=1
+--END--
+grep pattern file1 file2 | xargs '-I{}' echo '{}' > outlist
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 4
+argv: 'grep pattern file1 file2'
+nredirs: 0
+2/2:
+cmd:
+argc: 4
+argv: 'xargs -I{} echo {}'
+nredirs: 1
+redirs:
+fd=1 op='>' file="outlist"
+--END--

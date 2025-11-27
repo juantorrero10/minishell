@@ -101,10 +101,11 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
                     error_parse(ERR_INVALID_REDIR_SYNTAX, ptr + strloc(arr, idx-1));
                     goto __redir_abort;
                 }
+            rd_idx = idx;
             if (tok_type(arr, idx+1) == TOK_REDIR_RHS_CLOSE) {
                 curr_rd->kind = REDIR_CLOSE; break;
             }
-            rd_idx = idx;
+            
             curr_rd->kind = REDIR_FD;
             curr_rd->target.fd = arr->ptr[idx+1].number;
             break;
@@ -207,7 +208,6 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     }
 
     ret->type = AST_COMMAND;
-    //When redirections are supported, properly truncate array.
     view = make_arr_view(arr, 0, idx_redir);
     idx_cmdsub = find_cmd_sub(&view);
     if (idx_cmdsub != -1) {
@@ -407,12 +407,15 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     ast_node_pipeline_t ppl = (ast_node_pipeline_t){0};
     token_arr view;
     token_cat tc;
+    typeof_token tt;
     char *ptr           = (char*) cmdline;
     int ppl_end         = 0;
     int idx             = 0;
     int cmd_st          = 0;
     int cmd_end         = 0;
     int n_pipes         = 0;
+    bool after_pipe     = 0;
+    bool group_element  = 0; (void) group_element;
     // tokens allowed in a pipeline (using this to delimit the pipeline) + redirs
     // size: 6
     typeof_token allowed[] = {TOK_WORD, 
@@ -424,17 +427,29 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     // grammar rule: if not in a cmd sub, only tokens in [allowed] are valid.
     while (!last_token(arr, idx-1)) 
     {
-        tc = get_category(tok_type(arr, idx));
-        ppl_end = idx;
-        if (tok_type(arr, idx) == TOK_CMD_ST_START) cmd_sub++;
-        if (tok_type(arr, idx) == TOK_CMD_ST_END) cmd_sub--;
-        if (tok_type(arr, idx) == TOK_PIPE)n_pipes++;
+        after_pipe = 0;
+        tt = tok_type(arr, idx);
+        tc = get_category(tt);
+        if (tt == TOK_CMD_ST_START) cmd_sub++;
+        if (tt == TOK_CMD_ST_END) cmd_sub--;
+        if (tt == TOK_PIPE) {n_pipes++; after_pipe = 1; tt = tok_type(arr, ++idx); tc = get_category(tt);}
+
+        // Allow groups just after pipe of if fisrt token
+        if (!cmd_sub && ( !idx || after_pipe)) {
+            if (tc == TC_GROUP_START) {
+                //Skip until group end
+                while (get_category(tt) != TC_GROUP_END) { tt = tok_type(arr, idx++); }
+                after_pipe = 0;
+                continue;
+            }
+        }
         if (
             (!type_in_list(tok_type(arr, idx), allowed, 6)) && cmd_sub <= 0
             && (tc != TC_REDIR && tc != TC_RD_ST))
-            {ppl_end = idx; break;}
+            {break;}
         idx++;
     }
+    ppl_end = idx-1;
 
     // grammar rule: if last tok is pipe -> unexpected token
     // ex:        find / -type f | &grep -v "..."
@@ -448,21 +463,25 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     idx = 0;
     ppl.elements = ast_create_array(n_pipes + 1);
     while (idx <= ppl_end) {
-        if (tok_type(arr, idx) == TOK_CMD_ST_START) cmd_sub++;
-        if (tok_type(arr, idx) == TOK_CMD_ST_END) cmd_sub--;
+        tt = tok_type(arr, idx);
+        if (tt == TOK_CMD_ST_START) cmd_sub++;
+        if (tt == TOK_CMD_ST_END) cmd_sub--;
 
-        if ((tok_type(arr, idx) == TOK_PIPE && !cmd_sub) || idx == ppl_end) {
+        if ((tt == TOK_PIPE && !cmd_sub) || idx == ppl_end) {
             // Supress | token if not the last one.
             cmd_end = idx - 1;
             if (idx == ppl_end) cmd_end++;
+
             view = make_arr_view(arr, cmd_st, cmd_end);
             // Only allowing simple commands in pipelines.
-            temp = parse_line(&view, cmdline, (ppl.elements + ppl.ncommands++));
+            temp = parse_line(&view, cmdline, NULL);
+            
             if (g_abort_ast || !temp) {
                 if (ppl.elements)free(ppl.elements);
                 goto abort_ppl;
 
             }
+            memcpy(ppl.elements + ppl.ncommands++, temp, sizeof(ast_t));
             cmd_st = idx + 1;
             cmd_end = cmd_st;
         }

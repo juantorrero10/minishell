@@ -1,0 +1,46 @@
+find / -type f \
+| xargs du -b \
+| sort -nr \
+| head -n 2 \
+> out.txt
+
+
+# 1. Build a big list of files in HOME
+find "$HOME" -type f > allfiles.txt &
+
+# 2. Count lines
+wc -l < allfiles.txt > linecount.txt &
+
+# 3. Sort by filename length
+cat allfiles.txt \
+| awk "{ print length, $$0 }" \
+| sort -nr \
+| head -n 10 \
+> longest10.txt &
+
+jobs
+
+# Stop longest10 job
+kill -STOP %3
+
+# Test color output
+ls --color=always
+
+# Resume all
+kill -CONT %1
+kill -CONT %2
+kill -CONT %3
+
+jobs
+
+set A "inside var"
+echo "A: $A"
+unset A
+echo "A: $A"
+
+# Wait for jobs
+echo "Waiting for jobs to finish"
+fg %3 >& /dev/null
+fg %1 >& /dev/null
+fg %2 >& /dev/null
+exit

@@ -241,6 +241,7 @@ void test_start_test(char* file_input, char* file_output_summary) {
 
     while ((line_ptr = fgets(line, sizeof(line), in)) != NULL) {
         memcpy(input, line, sizeof(input));
+        memset(ast, 0, sizeof(ast));
         fgets(line, sizeof(line), in);
         while(!strstr(line, "--END--")) {
             strcat(ast, line);

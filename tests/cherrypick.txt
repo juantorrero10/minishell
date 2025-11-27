@@ -1,0 +1,228 @@
+echo "hello world"
+asts:
+cmd:
+argc: 2
+argv: 'echo hello world'
+nredirs: 0
+--END--
+ls -l /usr > out.txt
+asts:
+cmd:
+argc: 3
+argv: 'ls -l /usr'
+nredirs: 1
+redirs:
+fd=1 op='>' file="out.txt"
+--END--
+cat < input.txt
+asts:
+cmd:
+argc: 1
+argv: 'cat'
+nredirs: 1
+redirs:
+fd=0 op='<' file="input.txt"
+--END--
+echo hi | wc -c
+asts:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 2
+argv: 'echo hi'
+nredirs: 0
+2/2:
+cmd:
+argc: 2
+argv: 'wc -c'
+nredirs: 0
+--END--
+false && echo ok
+asts:
+sep: '&&'
+left:
+cmd:
+argc: 1
+argv: 'false'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo ok'
+nredirs: 0
+--END--
+true || echo fail
+asts:
+sep: '||'
+left:
+cmd:
+argc: 1
+argv: 'true'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo fail'
+nredirs: 0
+--END--
+echo inside ; echo outside
+asts:
+sep: ';'
+left:
+cmd:
+argc: 2
+argv: 'echo inside'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo outside'
+nredirs: 0
+--END--
+( echo world )
+asts:
+group:
+type: SUBSHELL
+children:
+cmd:
+argc: 2
+argv: 'echo world'
+nredirs: 0
+nredirs: 0
+--END--
+echo a >> log.txt
+asts:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 1
+redirs:
+fd=1 op='>>' file="log.txt"
+--END--
+sort < in > out
+asts:
+cmd:
+argc: 1
+argv: 'sort'
+nredirs: 2
+redirs:
+fd=0 op='<' file="in"
+fd=1 op='>' file="out"
+--END--
+echo a 2> err
+asts:
+cmd:
+argc: 2
+argv: 'echo a'
+nredirs: 1
+redirs:
+fd=2 op='>' file="err"
+--END--
+grep foo bar.txt
+asts:
+cmd:
+argc: 3
+argv: 'grep foo bar.txt'
+nredirs: 0
+--END--
+echo one | echo two | echo three
+asts:
+pipeline:
+ncommands: 3
+1/3:
+cmd:
+argc: 2
+argv: 'echo one'
+nredirs: 0
+2/3:
+cmd:
+argc: 2
+argv: 'echo two'
+nredirs: 0
+3/3:
+cmd:
+argc: 2
+argv: 'echo three'
+nredirs: 0
+--END--
+echo x && echo y || echo z
+asts:
+sep: '||'
+left:
+sep: '&&'
+left:
+cmd:
+argc: 2
+argv: 'echo x'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo y'
+nredirs: 0
+right:
+cmd:
+argc: 2
+argv: 'echo z'
+nredirs: 0
+--END--
+( ls | wc ) > out
+asts:
+group:
+type: SUBSHELL
+children:
+pipeline:
+ncommands: 2
+1/2:
+cmd:
+argc: 1
+argv: 'ls'
+nredirs: 0
+2/2:
+cmd:
+argc: 1
+argv: 'wc'
+nredirs: 0
+nredirs: 1
+redirs:
+fd=1 op='>' file="out"
+--END--
+echo a b c d
+asts:
+cmd:
+argc: 5
+argv: 'echo a b c d'
+nredirs: 0
+--END--
+mkdir -p dir/sub
+asts:
+cmd:
+argc: 3
+argv: 'mkdir -p dir/sub'
+nredirs: 0
+--END--
+rm -f file.txt
+asts:
+cmd:
+argc: 2
+argv: 'rm -f file.txt'
+nredirs: 0
+--END--
+printf "%s\n" hello
+asts:
+cmd:
+argc: 3
+argv: 'printf %s\n hello'
+nredirs: 0
+--END--
+echo test 1> a 2> b
+asts:
+cmd:
+argc: 2
+argv: 'echo test'
+nredirs: 2
+redirs:
+fd=1 op='>' file="a"
+fd=2 op='>' file="b"
+--END--

@@ -9,15 +9,18 @@
 
 int main(int argc, char** argv)
 {
-    char out[] = "summary.txt";
+    bool test = 1;
+    char out[] = "tests/summary.txt";
+    (void)out;
     ast_t* a; (void)a;
-    (void)argv;
-    if (argc < 1) {return 1;}
-    
+    (void)argv; (void) argc;
+    char buff[1024]; (void)buff;
+    char buff2[2048]; (void)buff2;
+    size_t sz = 0;
 
+    
     printf("parser test demo\n");
-    /*
-    while (1) {
+    while (!test) {
         printf("parserdemo> ");
         fgets(buff, 1024, stdin);
         sz = strlen(buff);
@@ -32,7 +35,7 @@ int main(int argc, char** argv)
             free(a);
         }
     }
-        */
-    test_start_test("cherrypick.txt", out);
+    
+    if (test) test_start_test((argc < 2)? "tests/cherrypick.txt" : argv[1], out);
     return (0);
 }

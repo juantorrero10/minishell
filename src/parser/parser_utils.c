@@ -1,5 +1,4 @@
 #include <mshparser.h>
-#define __DEBUG
 #include <../log.h>
 
 // returns buff for convenience
