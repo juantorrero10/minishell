@@ -74,7 +74,7 @@ int builtin_exit (int c, char** v, struct file_streams fss){
         g_dont_nl = 1;
         curr = g_bgjob_list;
         do {
-            kill(curr->pgid, SIGKILL);
+            kill(curr->pgid, SIGKILL); //Forzar terminación de los trabajos.
             curr = curr->next; 
         } while (curr);
         job_update_status();
@@ -184,6 +184,7 @@ int builtin_umask(int c, char** v, struct file_streams fss){
             MSH_ERR_C("umask: mascara no válida '%s'", v[1]);
             return 1;
         }
+        
         umask(mask);
         return 0;
     }
@@ -398,6 +399,8 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
     // Darle al trabajo el control de la terminal
     tcsetpgrp(STDIN_FILENO, pid);
+
+    job->background = 0;
 
     // Esperar a que termine.
     for (int i = 0; i < job->nprocceses; i++)

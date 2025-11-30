@@ -12,7 +12,7 @@ int job_add(job_t j) {
     job_t* curr, *prev;
     int highest = 0;
 
-    //----  copiar contenidos ----
+    //Copiar contenidos
     new->background = j.background;
     new->nprocceses = j.nprocceses;
     new->pgid = j.pgid;
@@ -248,7 +248,10 @@ void job_update_status() {
     curr = g_bgjob_list;
     do {
         cs = job_get_status(curr->pgid);
-        job_checkupdate(curr, cs, curr->state, true);
+        //Si ya no existe el proceso pero si sigue habiendo descriptor de trabajo. 
+        if ((int)cs == -1) {curr->state = DONE; job_checkupdate(curr, cs, curr->state, false);}
+        else job_checkupdate(curr, cs, curr->state, true);
+        
         INFO("job_checkupdate: %d -> %d", curr->state, cs);
         curr = curr->next;
     } while(curr);

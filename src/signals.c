@@ -1,21 +1,10 @@
 #include <minishell.h>
 #include <log.h>
 /**
- * @brief Handler de SIGINT (Ctrl + C) que no hace nada relevante.
+ * @brief Handler de SIGINT (Ctrl + C)
  */
 void sigint_handler(int sig) {
     (void)sig; fflush(stdout);
-}
-
-/**
- * @brief Handler de SIGTSTP (Ctrl + Z) que tampoco hace nada.
- */
-void sigtstp_handle(int sig) {
-    WARN("SIGTSTP");
-    (void)sig; fflush(stdout);
-    
-    // Reinstalar señal.
-    signal(SIGTSTP, sigtstp_handle);
 }
 
 /**
@@ -54,7 +43,4 @@ void sigchld_handler(int sig) {
             j->state = DONE;
         }
     }
-
-    // Reinstalar señar, se pone por defecto en cada uso.
-    signal(SIGCHLD, sigchld_handler);
 }

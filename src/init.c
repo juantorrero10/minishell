@@ -8,8 +8,6 @@
  *      -  Cambiar la variable $SHELL por la de este programa.
  */
 
-#define _DEF_BANNER
-
 #include <minishell.h>
 #include <log.h>
 
@@ -42,22 +40,30 @@ builtin_t g_builtin_function_table[] = {
  * @brief Instalar señales.
  */
 static void init_install_signals(void) {
-    struct sigaction action;
+    struct sigaction int_action;
+    struct sigaction chld_action;
 
-    // Establecer la function las "flags"
-    action.sa_handler = sigint_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
+    // Establecer la function
+    int_action.sa_handler = sigint_handler;
+    chld_action.sa_handler = sigchld_handler;
+    sigemptyset(&int_action.sa_mask);
+    sigemptyset(&chld_action.sa_mask);
+    int_action.sa_flags = 0;
+    chld_action.sa_flags = 0;
 
     // Reemplazar el handle por defecto por el nuestro, que no hace nada.
-    if (sigaction(SIGINT, &action, NULL) == -1) {
-        perror("sigaction");
+    if (sigaction(SIGINT, &int_action, NULL) == -1) {
+        perror("sigaction, SIGINT");
         exit(1);
     }
 
-    signal(SIGCHLD, sigchld_handler);
+    if (sigaction(SIGCHLD, &chld_action, NULL) == -1) {
+        perror("sigaction, SIGCHLD");
+        exit(1);
+    }
+
     signal(SIGTSTP, SIG_IGN);
-    signal(SIGTTIN,  SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
     signal(SIGTTOU, SIG_IGN);
 
     
@@ -101,10 +107,6 @@ void init_minishell(int argc, char** argv) {
     while(environ[idx++]) {
         g_num_envvars++;
     }
-    // Imprimir banner si no estamos en debug
-#ifndef __DEBUG
-    if (argc == 1 || strcmp(argv[1], "-s")) printf("%s", banner);
-#endif
     INFO("TERMINAL PID: %d", getpid());
     WARN("DEBUG MODE");
 }

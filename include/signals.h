@@ -3,6 +3,5 @@
 
 void sigint_handler(int sig);
 void sigchld_handler(int sig);
-void sigtstp_handle(int sig);
 
 #endif // SIGNALS_H_

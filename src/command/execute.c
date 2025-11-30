@@ -127,7 +127,6 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
 
         //Ejecutar comando
         setpgid(0, job->pgid);
-        INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
 
         execve(tokens->commands[i].filename, tokens->commands[i].argv, environ);
         // Si ha ocurrido un error.
@@ -142,8 +141,6 @@ static int launch_external(int i, tline *tokens, struct file_streams fss, job_t*
         spgret = setpgid(pid, job->pgid);
         if (spgret == -1) WARN("setpgid(): %d", spgret); else OKAY("setpgid(): %d", spgret);
         if (i == 0 && !tokens->background) tcsetpgrp(STDIN_FILENO, job->pgid);
-
-        // find / -type f | xargs du -b > /dev/null >& /dev/null
 
         // Si no es el primero, cerrar la anterior
         if (*prev_pipe != -1) close(*prev_pipe);
@@ -179,7 +176,7 @@ int execute_command(tline* tokens, const char* cmdline) {
     int pipe_fd[2];
     int prev_pipe_fd = -1;
     bool last_internal = 0;
-    bool not_interrupted = 0;
+    bool interrupted = 0;
     job_t job = {0};
     // -----------------------------------------------------------
 
@@ -256,7 +253,6 @@ int execute_command(tline* tokens, const char* cmdline) {
     // Si es un trabajo en primer dar control de la terminal y esperarle.
     if (!tokens->background) {
         g_dont_nl = 1;
-        //tcsetpgrp(STDIN_FILENO, job.pgid);
         for (int i = 0; i < tokens->ncommands; i++)
         {
             if (job.pids[i] == -1) continue;
@@ -264,21 +260,18 @@ int execute_command(tline* tokens, const char* cmdline) {
             INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
             // Si se detiene el trabajo con CTRL+Z -> añadir a la lista de trabajos.
             if (WIFSTOPPED(status)) {
-                tcsetpgrp(STDIN_FILENO, getpgrp()); // devolver control.
                 job.state = STOPPED;
                 job.background = 1;
                 job.id = job_add(job);  // Añadir trabajo a la lista
                 fputc('\n', stdout);
                 MSH_LOG("nuevo trabajo: [%d] %d (Detenido)", job.id, job.pgid);
                 ret = 0;
-                not_interrupted = 1;
-                signal(SIGTTIN, SIG_IGN);
-                signal(SIGTTOU, SIG_IGN);
-                signal(SIGTSTP, SIG_IGN);
+                interrupted = 1;
                 break;
             }
-        }  if (!last_internal && !not_interrupted)ret = WEXITSTATUS(status);
-        tcsetpgrp(STDIN_FILENO, getpgrp()); // Quitar control.
+        }  if (!last_internal && !interrupted) ret = WEXITSTATUS(status); //Obtener código de error.
+
+        tcsetpgrp(STDIN_FILENO, getpgrp()); // Devolver control.
         // Restrablecer señales.
         signal(SIGTTIN, SIG_IGN);
         signal(SIGTTOU, SIG_IGN);
