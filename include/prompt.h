@@ -19,13 +19,13 @@ int prompt_get_last_errorcode();
 #define PROMPT_LABEL "msh> "
 
 #define LAST_ERROR() if(prompt_get_last_errorcode() == EXIT_SUCCESS)     \
-                            COLOR_BRIGHT_BLUE(stdout);                         \
+                            M_COLOR_BRIGHT_BLUE(stdout);                         \
                         else {                                           \
-                            COLOR_RED(stdout);                           \
-                            STYLE_ITALIC(stdout);                        \
+                            M_COLOR_RED(stdout);                           \
+                            M_STYLE_ITALIC(stdout);                        \
                             prompt_print_last_errorcode();               \
                             prompt_print_str(" ");                       \
-                            COLOR_RESET(stdout); COLOR_RED(stdout);  }   \
+                            M_COLOR_RESET(stdout); M_COLOR_RED(stdout);  }   \
                     prompt_print_str("» ");
                     
 /**
@@ -44,24 +44,24 @@ int prompt_get_last_errorcode();
     LAST_ERROR();                                                           \
                                                                              \
     /* usuario */                                                     \
-    COLOR_MAGENTA(stdout);                                           \
-    STYLE_BOLD(stdout);                                                     \
+    M_COLOR_MAGENTA(stdout);                                           \
+    M_STYLE_BOLD(stdout);                                                     \
     prompt_print_username();                                                \
-    COLOR_RESET(stdout);                                                    \
+    M_COLOR_RESET(stdout);                                                    \
     prompt_print_str(" ");                                                  \
-    COLOR_BRIGHT_CYAN(stdout);                                              \
+    M_COLOR_BRIGHT_CYAN(stdout);                                              \
     prompt_print_cwd(true);                                                 \
     prompt_print_str(" ");                                                  \
-    COLOR_YELLOW(stdout);                                            \
-    STYLE_ITALIC(stdout);                                                    \
+    M_COLOR_YELLOW(stdout);                                            \
+    M_STYLE_ITALIC(stdout);                                                    \
     prompt_print_git_branch();                                              \
     prompt_print_str(" ");                                                  \
-    COLOR_RESET(stdout);                                                    \
+    M_COLOR_RESET(stdout);                                                    \
                                                                              \
     /* Final arrow */                                                       \
-    STYLE_BOLD(stdout);                                                     \
+    M_STYLE_BOLD(stdout);                                                     \
     prompt_print_str("msh> ");                                                 \
-    COLOR_RESET(stdout)
+    M_COLOR_RESET(stdout)
 
 /*
 #define PROMPT_PRINT()  LAST_ERROR();                   \

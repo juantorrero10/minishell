@@ -18,6 +18,9 @@ size_t g_num_envvars = 0;
 int g_last_error_code = 0;
 int g_exit_signal = 0;
 bool g_dont_nl = 0;
+bool g_background = 0;
+bool g_internal = 0;
+bool g_abort_execution = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;
 builtin_t g_builtin_function_table[] = {

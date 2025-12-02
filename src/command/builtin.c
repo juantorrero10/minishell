@@ -190,9 +190,9 @@ int builtin_umask(int c, char** v, struct file_streams fss){
     // Mostrar la máscara actual.
     mask = umask(0);
     umask(mask);
-    COLOR_BRIGHT_GREEN(fss.out);
+    M_COLOR_BRIGHT_GREEN(fss.out);
     fprintf(fss.out, "0%03o\n", mask);
-    COLOR_RESET(fss.out);
+    M_COLOR_RESET(fss.out);
 
     return 0L;
 }
@@ -215,9 +215,9 @@ int builtin_jobs (int c, char** v, struct file_streams fss){
         return 0;
     }
 
-    COLOR_BRIGHT_GREEN(fss.out);
+    M_COLOR_BRIGHT_GREEN(fss.out);
     fprintf(fss.out, "jobs: ");
-    COLOR_RESET(fss.out);
+    M_COLOR_RESET(fss.out);
 
     if (g_bgjob_list == NULL) {
         fprintf(fss.out, "there are no jobs.\n");
@@ -392,9 +392,9 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
         }
     }
 
-    COLOR_GREEN(fss.out);
+    M_COLOR_GREEN(fss.out);
     fprintf(fss.out, "%s:", job->cmdline);
-    COLOR_RESET(fss.out); putc('\n', fss.out);
+    M_COLOR_RESET(fss.out); putc('\n', fss.out);
 
     // Darle al trabajo el control de la terminal
     tcsetpgrp(STDIN_FILENO, pid);
@@ -431,8 +431,8 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
 int builtin_getpid(int c, char** v, struct file_streams fss){
     (void)c; (void)v;
-    COLOR_GREEN(fss.out);
+    M_COLOR_GREEN(fss.out);
     fprintf(fss.out, "%d", getpid());
-    COLOR_RESET(fss.out); fputc('\n', fss.out);
+    M_COLOR_RESET(fss.out); fputc('\n', fss.out);
     return 0;
 }

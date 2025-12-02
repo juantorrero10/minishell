@@ -1,7 +1,7 @@
 #ifndef PARSER_ERRORS_H_
 #define PARSER_ERRORS_H_
 
-#include <colors.h>
+#include <../colors.h>
 
 #define ERR_LBL "syntax error"
 #define CLR_LBL "    >>>     "
