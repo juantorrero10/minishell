@@ -19,11 +19,19 @@ static int get_internal_idx(char* argv0) {
     
 }
 
+/**
+ * @brief inside a forked process
+ */
+static int apply_redirections( ... )
 
-static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline) {
+
+static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, bool force_fork) {
     (void)cmdline;
+    (void)force_fork;
     int internal_idx = 0;
     ast_node_command_t cmd;
+    bool overwrite = 0;
+    char** ow = g_overwrite_external;
     pid_t pid = 0;
     //TEMP
     struct file_streams fss = {.in = stdin, .out = stdout, .err = stderr};
@@ -36,12 +44,19 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline) 
         return EXIT_ERROR_UNEXPECTED_AST;
     }
 
+    //overwrite commands
+    while(*ow) { 
+        if (!strcmp(cmd.argv[0], *ow++)) {
+            overwrite = 1; break;
+        }
+    }
+
     //TEMP
     if(cmd.nredirs > 0) {
         MSH_LOG("not yet.");
     }
     //Internal commands
-    if (cmd.filename == NULL) {
+    if (cmd.filename == NULL || overwrite) {
         if( (internal_idx = get_internal_idx(cmd.argv[0]) ) == -1) {
             MSH_ERR("unknown command %s%s%s%s%s", STYLE_BOLD, STYLE_UNDERLINE,
                 COLOR_BRIGHT_RED, tree->node.cmd.argv[0], COLOR_RESET);
@@ -58,10 +73,14 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline) 
 
     //Externals commands
     pid = fork();
+    if (pid == -1) {
+        MSH_ERR("fork failed");
+        perror("fork");
+        return EXIT_ERROR_FORKING;
+    }
 
     if (!pid) {
         /*--------------- CHILD -----------------*/
-
         /**
          * @todo check for redirs */
 
@@ -70,6 +89,9 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline) 
         }
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
         setpgid(0, 0);
+        signal(SIGTTOU, SIG_DFL);
+        signal(SIGTTIN, SIG_DFL);
+        signal(SIGTSTP, SIG_DFL);
         execve(cmd.filename, cmd.argv, environ);
         // Si ha ocurrido un error.
         perror(cmd.filename);
@@ -83,6 +105,7 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline) 
         job->pids[0] = pid;
         if (!job->pgid) job->pgid = pid;
         setpgid(pid, pid);
+        INFO("end_simple");
         return 0;
         
     }
@@ -100,10 +123,13 @@ static int execute_generic(job_t* job, ast_t* tree, const char* cmdline) {
 
     if (tree->type == AST_BG) {
         g_background = 1;
+        INFO("end_generic, bg");
         return execute_generic(job, tree->node.bg.children, cmdline);
     }
 
-    return execute_simple_command(job, tree, cmdline);
+    INFO("end_generic, simple");
+    return execute_simple_command(job, tree, cmdline, false);
+    
 }
 
 int execute_line(ast_t* tree, const char* cmdline) {
@@ -117,20 +143,26 @@ int execute_line(ast_t* tree, const char* cmdline) {
     g_background = 0;
     g_abort_execution = 0;
 
-    signal(SIGTTOU, SIG_DFL);
-    signal(SIGTTIN, SIG_DFL);
-    signal(SIGTSTP, SIG_DFL);
-
-
     ret = execute_generic(&job, tree, cmdline);
-
+    SEP();
+    OKAY("Exec returned: %d", ret);
+    INFO("PGID: %d", job.pgid);
+    INDENTED("PIDS: ");
+    INDENTED("");
+#ifdef __DEBUG
+    for (int i = 0; i < job.nprocceses; i++)
+    {
+        LOG("%d", job.pids[i]);
+        if (i != job.nprocceses - 1) LOG(", ");
+    } NL();
+#endif
     if (!g_internal && !g_abort_execution) {
         if (!g_background) {
             g_dont_nl = 1;
             tcsetpgrp(STDIN_FILENO, job.pgid);
             for (int i = 0; i < job.nprocceses; i++)
             {
-                if (job.pids[i] == -1) continue;
+                if (job.pids[i] == -1) continue; //Skip internals
                 waitpid(job.pids[i], &status, WUNTRACED);
                 INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
 
@@ -165,5 +197,7 @@ int execute_line(ast_t* tree, const char* cmdline) {
     }
     job_update_status();
     free(job.pids);
+    INFO("end_line");
+    SEP();
     return ret;
 }

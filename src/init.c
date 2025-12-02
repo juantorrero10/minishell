@@ -23,6 +23,7 @@ bool g_internal = 0;
 bool g_abort_execution = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs;
+char* g_overwrite_external[] = {"kill", NULL};
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},
         {"cd", builtin_chdir},
@@ -44,22 +45,29 @@ builtin_t g_builtin_function_table[] = {
  * @brief Instalar señales.
  */
 static void init_install_signals(void) {
-    struct sigaction action;
+    struct sigaction action1;
+    struct sigaction action2;
 
     // Establecer la function las "flags"
-    action.sa_handler = sigint_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
+    action1.sa_handler = sigint_handler;
+    action2.sa_handler = sigchld_handler;
+    sigemptyset(&action1.sa_mask);
+    sigemptyset(&action2.sa_mask);
+    action1.sa_flags = 0;
+    action2.sa_flags = 0;
 
     // Reemplazar el handle por defecto por el nuestro, que no hace nada.
-    if (sigaction(SIGINT, &action, NULL) == -1) {
-        perror("sigaction");
+    if (sigaction(SIGINT, &action1, NULL) == -1) {
+        perror("sigaction, SIGINT");
         exit(1);
     }
-
-    signal(SIGCHLD, sigchld_handler);
-    signal(SIGTSTP, sigtstp_handle);
-
+    if (sigaction(SIGCHLD, &action2, NULL) == -1) {
+        perror("sigaction, SIGCHLD");
+        exit(1);
+    }
+    signal(SIGTSTP, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    signal(SIGTTOU, SIG_IGN);
     
 }
 

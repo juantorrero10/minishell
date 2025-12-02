@@ -2,7 +2,7 @@
 #define PARSER_TEST_TEST_AST_H_
 
 #include <mshparser.h>
-#include <colors.h>
+#include <../colors.h>
 
 
 

@@ -52,7 +52,7 @@ int prompt_get_last_errorcode();
     M_COLOR_BRIGHT_CYAN(stdout);                                              \
     prompt_print_cwd(true);                                                 \
     prompt_print_str(" ");                                                  \
-    M_COLOR_YELLOW(stdout);                                            \
+    M_COLOR_GREEN(stdout);                                            \
     M_STYLE_ITALIC(stdout);                                                    \
     prompt_print_git_branch();                                              \
     prompt_print_str(" ");                                                  \

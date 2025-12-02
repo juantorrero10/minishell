@@ -35,4 +35,6 @@ extern bool g_internal;
 
 extern bool g_abort_execution;
 
+extern char* g_overwrite_external[];
+
 #endif // COMMAND_EXECUTE_H_

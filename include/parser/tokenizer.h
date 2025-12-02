@@ -1,7 +1,7 @@
 #ifndef PARSER_TOKENIZER_H_
 #define PARSER_TOKENIZER_H_
 
-#define WORD_BASE "-_.=/$"
+#define WORD_BASE "-_.=/$%"
 #define WORD_SPCHARS ":;\\?! "
 
 #define isokforwords(c) (isalnum(c) || strchr(WORD_BASE, c)) 

@@ -9,7 +9,7 @@
 
 int main(int argc, char** argv)
 {
-    bool test = 1;
+    bool test = 0;
     char out[] = "tests/summary.txt";
     (void)out;
     ast_t* a; (void)a;
@@ -19,7 +19,7 @@ int main(int argc, char** argv)
     size_t sz = 0;
 
     
-    printf("parser test demo\n");
+    printf("parser test demmmmmo\n");
     while (!test) {
         printf("parserdemo> ");
         fgets(buff, 1024, stdin);

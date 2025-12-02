@@ -237,7 +237,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     }
 
     // STEP 2: make the fucking argvs
-     cmd.argc = argc;
+    cmd.argc = argc;
     cmd.argv = malloc(sizeof(char*) * (argc + 1)); // +1 null terminated string.
     if (!cmd.argv) { /* handle oom if you want */ }
     cmd.argv[argc] = NULL;
@@ -397,6 +397,11 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
     view_right = make_arr_view(arr, idx+1, arr->occupied - 1);
     sep.left = parse_line(&view_left, cmdline, NULL);
     sep.right = parse_line(&view_right, cmdline, NULL);
+    if (g_abort_ast) {
+        ast_free(sep.left); ast_free(sep.right);
+        free(ret);
+        return NULL;
+    }
     ret->node.sep = sep;
     return ret;
 }
@@ -446,7 +451,8 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
         if (
             (!type_in_list(tok_type(arr, idx), allowed, 6)) && cmd_sub <= 0
             && (tc != TC_REDIR && tc != TC_RD_ST))
-            {break;}
+            { error_parse(ERR_UNEXP, ptr + strloc(arr, idx));
+            free(ret); g_abort_ast = 1; return NULL;}
         idx++;
     }
     ppl_end = idx-1;
@@ -456,7 +462,6 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     //                           ^ end
     if (!type_in_list(tok_type(arr, ppl_end), allowed, 6)) {
         error_parse(ERR_UNEXP, ptr + strloc(arr, ppl_end));
-        error_clarify("only simple commands are allowed inside a pipeline for now.");
         free(ret); g_abort_ast = 1; return NULL;
     }
 

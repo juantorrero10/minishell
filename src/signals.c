@@ -8,17 +8,6 @@ void sigint_handler(int sig) {
 }
 
 /**
- * @brief Handler de SIGTSTP (Ctrl + Z) que tampoco hace nada.
- */
-void sigtstp_handle(int sig) {
-    WARN("SIGTSTP");
-    (void)sig; fflush(stdout);
-    
-    // Reinstalar señal.
-    signal(SIGTSTP, sigtstp_handle);
-}
-
-/**
  * @brief Handler de SIGCHLD (creación de un proceso hijo) con fork();
  * Marca los trabajos como DONE cuando todos sus procesos hijos han terminado.
  */
@@ -54,7 +43,4 @@ void sigchld_handler(int sig) {
             j->state = DONE;
         }
     }
-
-    // Reinstalar señar, se pone por defecto en cada uso.
-    signal(SIGCHLD, sigchld_handler);
 }
