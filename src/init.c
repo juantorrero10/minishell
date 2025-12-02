@@ -1,11 +1,7 @@
 /**
  * En este archivo estaran las functiones que se encargan de inicializar
- * lo que minishell necesita para funcionar.
- * Minishell necesita antes que nada:
- *      -  Reemplazar el "handler" del las señales SIGINT para el propio shell y los procesos hijo.
- *      -  Reemplazar el handler de las señales SIGCHLG para notificar cuando los procesos en segundo plano terminan.
- *      -  Obtener el numero de variables del entorno del sistema -> g_num_envvars
- *      -  Cambiar la variable $SHELL por la de este programa.
+ * lo que minishell necesita para funcionar e inicialización de variables
+ * globales.
  */
 
 #include <minishell.h>
