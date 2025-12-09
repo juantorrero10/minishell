@@ -3,3 +3,4 @@ build
 other
 deprecated.txt
 .vscode
+src/command/execute_old.cc

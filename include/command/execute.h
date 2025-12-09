@@ -37,4 +37,6 @@ extern bool g_abort_execution;
 
 extern char* g_overwrite_external[];
 
+extern bool g_last_ppl_element;
+
 #endif // COMMAND_EXECUTE_H_

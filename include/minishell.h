@@ -4,7 +4,8 @@
 #define _out_
 
 //Necesario para sigaction y otras definiciones que dependen de la defincion de este macro.
-#define _XOPEN_SOURCE 700 
+#define _XOPEN_SOURCE 700
+#define _GNU_SOURCE
 
 //Standard
 #include <stdio.h>
@@ -19,10 +20,10 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <ctype.h>
-
-#include <parser.h>
+#include <fcntl.h>
 
 #include <parser/public.h>
+#include <tempparser.h>
 
 #include <macros.h>
 #include <prompt.h>
@@ -33,7 +34,6 @@
 #include <command/execute.h>
 #include <command/builtin.h>
 #include <command/job.h>
-
 
 
 #endif // MINISHELL_H_

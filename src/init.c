@@ -21,8 +21,9 @@ bool g_dont_nl = 0;
 bool g_background = 0;
 bool g_internal = 0;
 bool g_abort_execution = 0;
+bool g_last_ppl_element = 0;
 job_llist g_bgjob_list = NULL;
-size_t g_sz_jobs;
+size_t g_sz_jobs = 0;
 char* g_overwrite_external[] = {"kill", NULL};
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},

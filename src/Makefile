@@ -15,7 +15,6 @@ SRC_DIR=.
 SRC = main.c read.c prompt.c init.c env.c signals.c command/execute.c command/builtin.c command/job.c
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
-LIB = parser64
 
 LIB_FLAGS = $(addprefix -l, $(LIB))
 

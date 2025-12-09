@@ -19,19 +19,103 @@ static int get_internal_idx(char* argv0) {
     
 }
 
-/**
- * @brief inside a forked process
- */
-static int apply_redirections( ... )
+static size_t get_npids(ast_t* tree, bool simple) {
+    if (!tree) return 0;
+    switch (tree->type)
+    {
+    case AST_COMMAND:
+        if (tree->node.cmd.filename || !simple) {
+            return 1;
+        } else return 0;
+    case AST_PIPELINE:
+        return tree->node.ppl.nelements;
+    case AST_GROUP:
+        return get_npids(tree->node.grp.children, true);
+    case AST_BG:
+        return get_npids(tree->node.bg.children, false);
+    case AST_LIST:
+        return get_npids(tree->node.sep.left, simple) + 
+            get_npids(tree->node.sep.right, simple);
+    default:
+        return 0;
+    }
+}
 
 
-static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, bool force_fork) {
+static int handle_redirection(ast_node_redir_t* rd) {
+    int new_fd = 0;
+
+    //Default mask and mode values
+    int flag_mask = O_CREAT | O_TRUNC | O_WRONLY;
+    int mode_mask = 0644;
+
+    switch (rd->op)
+    {
+    case TOK_REDIR_IN:
+        flag_mask = O_RDONLY;
+        goto L1;
+    case TOK_REDIR_OUT_APPEND:
+        flag_mask = O_CREAT | O_APPEND | O_WRONLY;
+        goto L1;
+    case TOK_REDIR_READ_WRITE:
+        flag_mask = O_CREAT | O_RDWR;
+        goto L1;
+    case TOK_REDIR_OUT:
+L1:
+        if (!(flag_mask & O_CREAT)) {
+            mode_mask = umask(0);
+            umask(mode_mask);
+        }
+        if ((new_fd = open(rd->target.filename, flag_mask, mode_mask)) == -1) {
+            MSH_ERR("couldn't open file '%s': %s", rd->target.filename, strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_OPENING_FILE;
+        }
+        dup2(new_fd, rd->left_fd);
+        close(new_fd);
+        break;
+    case TOK_REDIR_DUP_IN:
+    case TOK_REDIR_DUP_OUT:
+        if (rd->kind == REDIR_CLOSE) {
+            if (close(rd->left_fd) == -1) {
+                g_abort_execution = 1;
+                return EXIT_ERROR_CLOSING_FD;
+            }
+            break;
+        }
+        if (dup2(rd->target.fd, rd->left_fd) == -1) {
+            MSH_ERR("couldn't duplicate fds: %d -> %d: %s", rd->target.fd, rd->left_fd, strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_DUPING_FD;
+        } break;
+    //todo: herestr and heredoc
+    default:
+        MSH_ERR("unknown redirection type or not supported yet.");
+        g_abort_execution = 1;
+        break;
+    }
+
+    return 0;
+}
+
+// Forward declaration
+static int execute_generic(
+        job_t* job, 
+        ast_t* tree, 
+        const char* cmdline, 
+        bool force_fork, 
+        int* pipe_fd, int*
+        prev_pipe
+    );
+
+static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, bool force_fork, int* pipe_fd, int* prev_pipe) {
     (void)cmdline;
     (void)force_fork;
-    int internal_idx = 0;
+    int internal_idx = -1;
     ast_node_command_t cmd;
     bool overwrite = 0;
     char** ow = g_overwrite_external;
+    int ret = 0;
     pid_t pid = 0;
     //TEMP
     struct file_streams fss = {.in = stdin, .out = stdout, .err = stderr};
@@ -51,10 +135,6 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         }
     }
 
-    //TEMP
-    if(cmd.nredirs > 0) {
-        MSH_LOG("not yet.");
-    }
     //Internal commands
     if (cmd.filename == NULL || overwrite) {
         if( (internal_idx = get_internal_idx(cmd.argv[0]) ) == -1) {
@@ -68,25 +148,49 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         job->pids = malloc(sizeof(pid_t));
         job->nprocceses++;
         job->pids[0] = -1;
-        return g_builtin_function_table[internal_idx].fptr(cmd.argc, cmd.argv, fss);
     }
 
     //Externals commands
-    pid = fork();
+    if (!g_internal || force_fork)
+        pid = fork();
     if (pid == -1) {
         MSH_ERR("fork failed");
         perror("fork");
         return EXIT_ERROR_FORKING;
     }
 
-    if (!pid) {
+    if (pid == 0) {
         /*--------------- CHILD -----------------*/
-        /**
-         * @todo check for redirs */
 
-        if (cmd.nredirs) {
-            //
+        //internal
+        if (g_internal) {
+            if (force_fork) {
+                exit(g_builtin_function_table[internal_idx].fptr(cmd.argc, cmd.argv, fss));
+            }
+            else return g_builtin_function_table[internal_idx].fptr(cmd.argc, cmd.argv, fss);
         }
+
+        // Redirections
+        if (cmd.nredirs && !g_internal) {
+            for (size_t i = 0; i < cmd.nredirs; i++)
+            {
+                ret = handle_redirection(&cmd.redirs[i]);
+                if (g_abort_execution) exit(ret);
+            }
+        }
+
+        // Pipe redirections
+        if (pipe_fd && prev_pipe) {
+            if (*prev_pipe != -1) {
+                dup2(*prev_pipe, STDIN_FILENO);
+                close(*prev_pipe);
+            }
+            if (!g_last_ppl_element) {
+                dup2(pipe_fd[1], STDOUT_FILENO);
+                close(pipe_fd[0]);
+            }
+        }
+
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
         setpgid(0, 0);
         signal(SIGTTOU, SIG_DFL);
@@ -99,36 +203,97 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         _exit(127);
     } else {
         /*--------------- PARENT -----------------*/
-        //TEMP
-        job->pids = malloc(sizeof(pid_t));
+        job->pids[job->nprocceses] = pid;
         job->nprocceses++;
-        job->pids[0] = pid;
         if (!job->pgid) job->pgid = pid;
         setpgid(pid, pid);
+
+        //pipe shit
+        if (pipe_fd && prev_pipe) {
+            if (*prev_pipe != -1) close(*prev_pipe);
+            if (!g_last_ppl_element) {
+                close(pipe_fd[1]);
+                *prev_pipe = pipe_fd[0];
+            }
+        }
+    
+
         INFO("end_simple");
         return 0;
         
     }
 }
 
+static int execute_pipeline(job_t* job, ast_t* tree, const char* cmdline) {
+    size_t nelements;
+    int pipe_fd[2]      = {-1, -1};
+    int ret             = 0;
+    int prev_pipe       = -1;
 
-static int execute_generic(job_t* job, ast_t* tree, const char* cmdline) {
+    (void)job;
+    (void)cmdline;
+    (void)tree;
+
+    nelements = tree->node.ppl.nelements;
+    g_last_ppl_element = 0;
+
+    // Note that this point pipelines are guaranteed to have at least 2 elements.
+    for (size_t i = 0; i < nelements; i++)
+    {
+        if (i == nelements - 1) {g_last_ppl_element = 1;}
+        else {
+            if (pipe(pipe_fd) == -1) {
+                MSH_ERR("couldn't create pipe: %s", strerror(errno));
+                g_abort_execution = 1;
+                return EXIT_ERROR_CREATING_PIPE;
+            }
+        }
+
+        if (tree->node.ppl.elements[i].type == AST_COMMAND) {
+            ret = execute_generic(job, &tree->node.ppl.elements[i], cmdline, true, pipe_fd, &prev_pipe);
+        } else if (tree->node.ppl.elements[i].type == AST_GROUP) {
+            ret = execute_generic(job, &tree->node.ppl.elements[i], cmdline, true, pipe_fd, &prev_pipe);
+        } else {MSH_ERR("parsing went wrong"); g_abort_execution = 1; return EXIT_ERROR_UNEXPECTED_AST;}
+        
+    }
+    
+    return ret;
+}
+
+
+static int execute_generic(
+        job_t* job, 
+        ast_t* tree, 
+        const char* cmdline, 
+        bool force_fork, 
+        int* pipe_fd, int*
+        prev_pipe
+    ) {
     (void)cmdline;
 
     //////TEMP////////
-    if (tree->type != AST_BG && tree->type != AST_COMMAND) {
+    if (tree->type != AST_BG 
+        && tree->type != AST_COMMAND 
+        && tree->type != AST_PIPELINE
+        ) {
         MSH_ERR("not yet.");
         return -1;
     }
+    
 
     if (tree->type == AST_BG) {
         g_background = 1;
         INFO("end_generic, bg");
-        return execute_generic(job, tree->node.bg.children, cmdline);
+        return execute_generic(job, tree->node.bg.children, cmdline, false, NULL, NULL);
+    }
+
+    else if (tree->type == AST_PIPELINE) {
+        INFO("end_generic, pipeline");
+        return execute_pipeline(job, tree, cmdline);
     }
 
     INFO("end_generic, simple");
-    return execute_simple_command(job, tree, cmdline, false);
+    return execute_simple_command(job, tree, cmdline, force_fork, pipe_fd, prev_pipe);
     
 }
 
@@ -143,7 +308,8 @@ int execute_line(ast_t* tree, const char* cmdline) {
     g_background = 0;
     g_abort_execution = 0;
 
-    ret = execute_generic(&job, tree, cmdline);
+    job.pids = malloc(get_npids(tree, false) * sizeof(pid_t));
+    ret = execute_generic(&job, tree, cmdline, false, NULL, NULL);
     SEP();
     OKAY("Exec returned: %d", ret);
     INFO("PGID: %d", job.pgid);

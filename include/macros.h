@@ -4,12 +4,19 @@
 #define INPUT_LINE_MAX 1024
 #define PATH_MAX 256
 
+/* Falling through switch cases is used throughout the code 
+   and we need the compiler to ignore it
+*/
+#define IGN_FTHRH __attribute__((fallthrough))
+
 #define EXIT_COMMAND_NOT_FOUND (int)-1
 #define EXIT_ERROR_OPENING_FILE (int)-2
 #define EXIT_ERROR_FORKING (int)-3
 #define EXIT_ERROR_CREATING_PIPE (int)-4
 #define EXIT_ERROR_CREATING_JOB (int)-5
 #define EXIT_ERROR_UNEXPECTED_AST (int)-6
+#define EXIT_ERROR_DUPING_FD (int)-7
+#define EXIT_ERROR_CLOSING_FD (int)-8
 
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 

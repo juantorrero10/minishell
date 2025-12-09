@@ -1,7 +1,7 @@
-find / -type f \
-| xargs du -b \
+find / -type f 2> /dev/null \
+| xargs du -b 2> /dev/null \
 | sort -nr \
-| head -n 2 \
+| head -n 2 -a 2 \
 > out.txt
 
 

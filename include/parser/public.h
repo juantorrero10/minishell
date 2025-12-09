@@ -114,7 +114,7 @@ typedef struct {
 
 typedef struct {
     ast_t* elements;
-    size_t ncommands;
+    size_t nelements;
 } ast_node_pipeline_t;
 
 // They can either be a group or a subshell

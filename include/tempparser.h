@@ -1,4 +1,7 @@
-# pragma once
+#ifndef TEMPPARSER_H_
+#define TEMPPARSER_H_
+
+//TEEEEMP
 
 typedef struct {
 	char * filename;
@@ -17,3 +20,4 @@ typedef struct {
 
 extern tline * tokenize(char *str);
 
+#endif // TEMPPARSER_H_
