@@ -34,6 +34,7 @@
 #include <command/execute.h>
 #include <command/builtin.h>
 #include <command/job.h>
+#include <command/executils.h>
 
 
 #endif // MINISHELL_H_

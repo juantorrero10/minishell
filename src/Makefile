@@ -12,7 +12,7 @@ BIN_DIR=../build/bin
 SRC_DIR=.
 
 # archivos .c fuente
-SRC = main.c read.c prompt.c init.c env.c signals.c command/execute.c command/builtin.c command/job.c
+SRC = main.c read.c prompt.c init.c env.c signals.c command/execute.c command/builtin.c command/job.c command/executils.c
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
 
