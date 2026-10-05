@@ -19,9 +19,9 @@
 #include <ctype.h>
 
 
-#include <grammar.h>
 #include <heredoc.h>
 #include <errors.h>
+#include <token.h>
 #include <ast.h>
 #include <tokenizer.h>
 #include <parser.h>

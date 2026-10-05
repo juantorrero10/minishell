@@ -41,7 +41,7 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
 
     //Internal commands
     if (cmd.filename == NULL || overwrite) {
-        if( (internal_idx = get_internal_idx(cmd.argv[0]) ) == -1) {
+        if( (internal_idx = eu_get_internal_idx(cmd.argv[0]) ) == -1) {
             MSH_ERR("unknown command %s%s%s%s%s", STYLE_BOLD, STYLE_UNDERLINE,
                 COLOR_BRIGHT_RED, tree->node.cmd.argv[0], COLOR_RESET);
             g_abort_execution = 1;
@@ -49,9 +49,8 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         }
         g_internal = 1;
         //TEMP
-        job->pids = malloc(sizeof(pid_t));
-        job->nprocceses++;
-        job->pids[0] = -1;
+        job->pids.count = 1;
+        job->pids.data[0] = -1;
     }
 
     //Externals commands
@@ -90,7 +89,7 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         if (cmd.nredirs && !g_internal) {
             for (size_t i = 0; i < cmd.nredirs; i++)
             {
-                ret = handle_redirection(&cmd.redirs[i]);
+                ret = eu_handle_redirection(&cmd.redirs[i]);
                 if (g_abort_execution) exit(ret);
             }
         }
@@ -107,8 +106,7 @@ static int execute_simple_command(job_t* job, ast_t* tree, const char* cmdline, 
         _exit(127);
     } else {
         /*--------------- PARENT -----------------*/
-        job->pids[job->nprocceses] = pid;
-        job->nprocceses++;
+        job->pids.data[job->pids.count++] = pid;
         if (!job->pgid) job->pgid = pid;
         setpgid(pid, pid);
 
@@ -204,6 +202,9 @@ static int execute_generic(
 int execute_line(ast_t* tree, const char* cmdline) {
     job_t job = (job_t){0};
     job.cmdline = (char*)cmdline;
+    if (!tree || !cmdline || !(cmdline[0])) {
+        return 0;
+    }
     size_t npids = 0;
     int status = 0;
     int ret = 0;
@@ -213,28 +214,33 @@ int execute_line(ast_t* tree, const char* cmdline) {
     g_background = 0;
     g_abort_execution = 0;
 
-    job.pids = malloc((npids = get_npids(tree, false)) * sizeof(pid_t));
-    INFO("NPIDS: %zu", npids);
+    // Look-ahead for number of PIDS to encounter
+    npids = eu_lookahead_get_npids(tree, false);
+    // Allocate PID which will be filled up as the ast is being executed.
+    job.pids.data = malloc(npids * sizeof(pid_t));
+    job.pids.count = 0;
+
+    INFO("EXPECTED PIDS: %zu", npids);
     ret = execute_generic(&job, tree, cmdline, false, NULL, NULL);
     SEP();
     OKAY("Exec returned: %d", ret);
     INFO("PGID: %d", job.pgid);
     INFO("PIDS: ");
 #ifdef __DEBUG
-    for (int i = 0; i < job.nprocceses; i++)
+    for (int i = 0; i < job.pids.count; i++)
     {
-        LOG("%d", job.pids[i]);
-        if (i != job.nprocceses - 1) LOG(", ");
+        LOG("%d", job.pids.data[i]);
+        if (i != job.pids.count - 1) LOG(", ");
     } NL();
 #endif
     if (!g_internal && !g_abort_execution) {
         if (!g_background) {
             g_dont_nl = 1;
             tcsetpgrp(STDIN_FILENO, job.pgid);
-            for (int i = 0; i < job.nprocceses; i++)
+            for (int i = 0; i < job.pids.count; i++)
             {
-                if (job.pids[i] == -1) continue; //Skip internals
-                waitpid(job.pids[i], &status, WUNTRACED);
+                if (job.pids.data[i] == -1) continue; //Skip internals
+                waitpid(job.pids.data[i], &status, WUNTRACED);
                 INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
 
                 if (WIFSTOPPED(status)) {
@@ -267,7 +273,7 @@ int execute_line(ast_t* tree, const char* cmdline) {
         }
     }
     job_update_status();
-    free(job.pids);
+    free(job.pids.data);
     INFO("end_line");
     SEP();
     return ret;

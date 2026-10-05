@@ -1,8 +1,8 @@
-#include <mshparser.h>
+#include <private.h>
 #include <../log.h>
 
 // returns buff for convenience
-char* str_tok(typeof_token tt, char buff[])
+char* str_tok(token_kind tt, char buff[])
 {
     switch (tt) {
         case TOK_WORD:                 strcpy(buff, "WORD"); break;
@@ -52,7 +52,7 @@ void pu_peek(token_arr* arr) {
     token_t* c;
     char buff[20];
 
-    for (size_t i = 0; i < arr->occupied; i++)
+    for (size_t i = 0; i < arr->count; i++)
     {
         c = arr->ptr + i;
         str_tok(c->type, buff);
@@ -156,7 +156,7 @@ done:
     return ret;
 }
 
-token_cat get_category(typeof_token tt) {    
+token_category categorize_token(token_kind tt) {    
     switch (tt)
     {
     case TOK_AMP:
@@ -214,18 +214,18 @@ token_cat get_category(typeof_token tt) {
  */
 token_arr make_arr_view(token_arr* arr, size_t start, size_t end) {
     token_arr ret = (token_arr){0};
-    if (end == __INT32_MAX__) end = arr->occupied - 1;
+    if (end == __INT32_MAX__) end = arr->count - 1;
 
     if (start > end) {return (token_arr){NULL, 0, 0};}
 
     //cap with real values
-    start = (start > arr->occupied-1)? arr->occupied-1 : start;
-    end = (end > arr->occupied-1)? arr->occupied-1 : end;
+    start = (start > arr->count-1)? arr->count-1 : start;
+    end = (end > arr->count-1)? arr->count-1 : end;
 
     ret.ptr = arr->ptr + start;
-    ret.occupied = end - start + 1;
+    ret.count = end - start + 1;
 
-    ret.allocated = arr->allocated - start;
+    ret.capacity = arr->capacity - start;
     return ret;
 }
 
@@ -236,14 +236,14 @@ int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
     int group_weight    = 0;
     int idx             = 0;
     bool found          = 0;
-    token_cat tc;
+    token_category tc;
     char* ptr           = (char*)cmdline;
 
-    if (arr->occupied <= 1) return -1;
+    if (arr->count <= 1) return -1;
 
     // Search for an open separator.
-    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
-        tc = get_category(arr->ptr[idx].type);
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->count) {
+        tc = categorize_token(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
         if (!group_weight && tc == TC_SEP 
@@ -256,7 +256,7 @@ int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
 
     // grammar rule: no {&&, ||} at the begining or end of element
     if (arr->ptr[idx].type != TOK_SEMI) {
-        if (idx == 0 || idx >= (int)arr->occupied-2) {
+        if (idx == 0 || idx >= (int)arr->count-2) {
             error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
             g_abort_ast = 1;
             return -2;
@@ -272,17 +272,17 @@ int find_pipe(token_arr* arr, const char* cmdline) {
     int group_weight    = 0;
     int idx             = 0;
     bool found          = 0;
-    token_cat tc;
+    token_category tc;
     char* ptr           = (char*)cmdline;
 
-    if (arr->occupied <= 1) return -1;
+    if (arr->count <= 1) return -1;
 
     // Not the time if there are list separators.
     if (find_list_sep(arr, cmdline, 0) >= 0) return -1;
 
     // Search for an open pipe token
-    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
-        tc = get_category(arr->ptr[idx].type);
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->count) {
+        tc = categorize_token(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
         if (tc == TC_CMD_SUB_START)group_weight++;
@@ -294,7 +294,7 @@ int find_pipe(token_arr* arr, const char* cmdline) {
     if(!found) return -1;
 
     // grammar rule: no | at the begining or end of element
-    if (idx == 0 || idx >= (int)arr->occupied-1) {
+    if (idx == 0 || idx >= (int)arr->count-1) {
         error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
         g_abort_ast = 1;
         return -2;
@@ -315,11 +315,11 @@ int find_redirs(token_arr* arr, const char* cmdline, _out_ int* n_redirs) {
     int f; (void)f; 
     int first           = -1;
     bool found          = 0;
-    token_cat tc;
+    token_category tc;
     char* ptr           = (char*)cmdline;
 
-    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
-        tc = get_category(arr->ptr[idx].type);
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->count) {
+        tc = categorize_token(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
         if (tc == TC_CMD_SUB_START)group_weight++;
@@ -339,7 +339,7 @@ int find_redirs(token_arr* arr, const char* cmdline, _out_ int* n_redirs) {
     // Only grammar enforcing that we can do here is
     // Error when fisrt redir is at last pos of the array.
     // grammar rule: redirections need at least another token at the left.
-    if (arr->ptr[first+1].type == TOK_EOL || first >= (int)arr->occupied - 1) {
+    if (arr->ptr[first+1].type == TOK_EOL || first >= (int)arr->count - 1) {
         error_parse(ERR_UNEXP, ptr + arr->ptr[first].str_idx-1);
         error_parse(ERR_EXP, "expected fd, filename, string or heredoc delimiter.");
         g_abort_ast = 1;
@@ -355,10 +355,10 @@ int find_cmd_sub(token_arr* arr) {
     int group_weight    = 0;
     int idx             = 0;
     bool found          = 0;
-    token_cat tc;
+    token_category tc;
 
-    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->occupied) {
-        tc = get_category(arr->ptr[idx].type);
+    while(arr->ptr[idx].type != TOK_EOL && idx < (int)arr->count) {
+        tc = categorize_token(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
         if (tc == TC_CMD_SUB_START) {found=1; break;}
@@ -437,7 +437,7 @@ char* find_binary_path(const char* name) {
     return NULL;
 }
 
-bool type_in_list(typeof_token t, typeof_token* l, size_t sz) {
+bool type_in_list(token_kind t, token_kind* l, size_t sz) {
     for (size_t i = 0; i < sz; i++)
     {
         if (l[i] == t) return true;
@@ -454,10 +454,10 @@ bool type_in_list(typeof_token t, typeof_token* l, size_t sz) {
  * aborts AST if anything else
  */
 bool is_a_group(token_arr* arr, const char* cmdline) {
-    token_cat tc = 0;
+    token_category tc = 0;
     char* ptr = (char*)cmdline; //Make the compiler happy
 
-    tc = get_category(arr->ptr[0].type);
+    tc = categorize_token(arr->ptr[0].type);
 
     if (tc == TC_GROUP_START) {
         return true;
@@ -477,8 +477,8 @@ bool is_a_group(token_arr* arr, const char* cmdline) {
     
 }
 
-int redir_default_fd(typeof_token rd) {
-    if (get_category(rd) != TC_REDIR) return -1;
+int redir_default_fd(token_kind rd) {
+    if (categorize_token(rd) != TC_REDIR) return -1;
     switch (rd)
     {
     case TOK_REDIR_OUT:

@@ -1,4 +1,4 @@
-#include <mshparser.h>
+#include <private.h>
 
 void error_parse(err_t e, char* s) {
     const size_t MAX_ERROR_DISPLAY = 15;

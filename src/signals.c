@@ -22,15 +22,15 @@ void sigchld_handler(int sig) {
         if (!j) continue;
 
         // Marcar este proceso como terminado
-        for (int i = 0; i < j->nprocceses; i++) {
-            if (j->pids[i] == pid)
-                j->pids[i] = -1;
+        for (int i = 0; i < j->pids.count; i++) {
+            if (j->pids.data[i] == pid)
+                j->pids.data[i] = -1;
         }
 
         // 
         all_done = true;
-        for (int i = 0; i < j->nprocceses; i++) {
-            if (j->pids[i] != -1) {
+        for (int i = 0; i < j->pids.count; i++) {
+            if (j->pids.data[i] != -1) {
                 all_done = false;
                 break;
             }

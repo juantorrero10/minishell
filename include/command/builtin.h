@@ -22,15 +22,16 @@ extern builtin_t g_builtin_function_table[];
 extern int g_exit_signal;
 
 // Funciones de comandos internos.
-int builtin_exit        (int, char**, struct file_streams);
-int builtin_chdir       (int, char**, struct file_streams);
-int builtin_umask       (int, char**, struct file_streams);
-int builtin_jobs        (int, char**, struct file_streams);
-int builtin_fg          (int, char**, struct file_streams);
-int builtin_set         (int, char**, struct file_streams);
-int builtin_unset       (int, char**, struct file_streams);
-int builtin_kill         (int, char**, struct file_streams);
-int builtin_getpid(int c, char** v, struct file_streams fss);
+#define def_builtin(name) int name(int argc, char** argv, struct file_streams fss)
+def_builtin(builtin_exit);
+def_builtin(builtin_chdir);
+def_builtin(builtin_umask);
+def_builtin(builtin_jobs);
+def_builtin(builtin_fg);
+def_builtin(builtin_set);
+def_builtin(builtin_unset);
+def_builtin(builtin_kill);
+def_builtin(builtin_getpid);
 
 
 

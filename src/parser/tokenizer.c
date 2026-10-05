@@ -1,4 +1,4 @@
-#include <mshparser.h>
+#include <private.h>
 
 
 /**
@@ -8,21 +8,21 @@ static void push_token(token_arr* a, token_t* tok) {
     const size_t INITIAL_ALLOC_SIZE = 20;
     token_t t = *tok;
 
-    if (!a->allocated && !a->ptr) {
+    if (!a->capacity && !a->ptr) {
         a->ptr = malloc(sizeof(token_t)*INITIAL_ALLOC_SIZE);
         *a->ptr = t;
-        a->allocated = INITIAL_ALLOC_SIZE; a->occupied = 1;
+        a->capacity = INITIAL_ALLOC_SIZE; a->count = 1;
         if (t.value)a->ptr[0].value = t.value;
         return;
     } 
-    if ( a->allocated < a->occupied+1) {
-        a->allocated <<= 1;
-        a->ptr = realloc(a->ptr, a->allocated * sizeof(token_t));
+    if ( a->capacity < a->count+1) {
+        a->capacity <<= 1;
+        a->ptr = realloc(a->ptr, a->capacity * sizeof(token_t));
     }
     
-    a->ptr[a->occupied] = t;
-    if (t.value)a->ptr[a->occupied].value = t.value;
-    a->occupied++;
+    a->ptr[a->count] = t;
+    if (t.value)a->ptr[a->count].value = t.value;
+    a->count++;
     tok->value = NULL;
 }
 /*
@@ -74,21 +74,21 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
 }
 
 
-void free_token_arr(token_arr* a) {
+void token_arr_free(token_arr* a) {
 
-    for (size_t i = 0; i < a->occupied;i++){
+    for (size_t i = 0; i < a->count;i++){
         if (a->ptr[i].value)free(a->ptr[i].value);
     }
     free(a->ptr);
-    a->allocated = 0;
-    a->occupied = 0;
+    a->capacity = 0;
+    a->count = 0;
     a->ptr = NULL;
 }
 
 //Mini st for redirections;
-static typeof_token scan_redir_type(const char* s, _out_ int* skip_chars) {
+static token_kind scan_redir_type(const char* s, _out_ int* skip_chars) {
     const int __restrict_view = 3;
-    typeof_token t = TOK_ERROR;
+    token_kind t = TOK_ERROR;
     char* ptr;
     char* allowed = "><&";
     char c;
@@ -141,7 +141,7 @@ static size_t isnum(const char* s) {
     return sz2;
 }
 
-static void pile_push(char* pile, int* pile_top, char c) {
+static void stack_push(char* pile, int* pile_top, char c) {
     int pt = 0;
 
     pt = *pile_top;
@@ -149,7 +149,7 @@ static void pile_push(char* pile, int* pile_top, char c) {
     *pile_top = ++pt;
 }
 
-static char pile_pop(char* pile, int* pile_top) {
+static char stack_pop(char* pile, int* pile_top) {
     int pt = 0;
 
     pt = *pile_top;
@@ -160,7 +160,7 @@ static char pile_pop(char* pile, int* pile_top) {
 /**
  * @brief tokenizer state machine:
  */
-token_arr __tokenize(char *cmdline, _out_ int *st)
+token_arr tokenize(char *cmdline, _out_ int *st)
 {
     scanner s;
     token_arr r = {NULL, 0, 0};
@@ -177,7 +177,7 @@ token_arr __tokenize(char *cmdline, _out_ int *st)
     size_t word_start = 0;
     size_t word_end = 0;
     size_t word_len;
-    typeof_token tt = TOK_WORD;
+    token_kind tt = TOK_WORD;
 
     int dquoted = 0;
     int squoted = 0;
@@ -324,7 +324,7 @@ word:
         pc = 'S';
         if (dollar) {curr.type = TOK_CMD_ST_START; dquoted=0; cmd_sub++;pc='C';}
         else curr.type = TOK_LPAREN;
-        pile_push(pile, &pile_top, pc);
+        stack_push(pile, &pile_top, pc);
         dollar = 0;
         curr.str_idx = word_start;
         push_token(&r, &curr);
@@ -341,7 +341,7 @@ word:
 
         if (word_end > word_start)
             goto finish_word;
-        pc = pile_pop(pile, &pile_top);
+        pc = stack_pop(pile, &pile_top);
         if (pc == 'C') {
             curr = (token_t){0};
             curr.type = TOK_CMD_ST_END;

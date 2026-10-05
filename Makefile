@@ -5,15 +5,11 @@ CC = gcc
 DBG = gdb
 
 INC_DIR=include
-LIB_DIR=lib
 OBJ_DIR=build/obj
 BIN_DIR=build/bin
 SRC_DIR=src
 
 # archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
-LIB = parser64
-
-LIB_FLAGS = $(addprefix -l, $(LIB))
 
 SRC_MAIN     := $(wildcard src/*.c)  \
                 $(wildcard src/command/*.c)
@@ -52,7 +48,7 @@ all:$(BIN)
 $(BIN): $(OBJ) | $(BIN_DIR) $(OBJ_DIR)
 	@echo "$(CYAN)--------------------------------------------------------------------------"
 	@echo "	Linking: $(RED)$< $(CYAN)-> $(GREEN)$@$(WHITE)"
-	$(CC) $(CCFLAGS) -o $@ $(OBJ) -L$(LIB_DIR) $(LIB_FLAGS)
+	$(CC) $(CCFLAGS) -o $@ $(OBJ)
 	@echo " "
 
 # Build modules

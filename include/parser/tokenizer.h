@@ -9,8 +9,8 @@
 #define isokforvars(c) (isalnum(c) || c == '_')
 
 // Tokenizer functions for the parser module
-token_arr __tokenize(char* cmdline, _out_ int* st);
-void free_token_arr(token_arr* a);
+token_arr tokenize(char* cmdline, _out_ int* st);
+void token_arr_free(token_arr* a);
 
 /**ove noticed that the logic is wrong, vars should not be detected for now. if you do "User: $USER" it compunds to two words User and xxxxxx (being whatever the user is). It should be we continous word, any suggestions? */
 

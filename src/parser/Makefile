@@ -27,7 +27,7 @@ DEMO_MAIN = testdemo
 OBJ=$(SRC:%.c=$(OBJ_THIS)/%.o)
 BIN=$(BIN_THIS)/$(TARGET)
 
-CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
+CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR) -DCOMPILING_PARSER
 
 # modo debug
 ifdef DEBUG

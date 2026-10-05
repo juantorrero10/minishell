@@ -6,15 +6,20 @@
 
 typedef enum {RUNNING=0, STOPPED, DONE}job_state;
 
+
+struct pid_array {
+    int count;
+    pid_t* data;
+};
+
 typedef struct _job_desc {
-    pid_t *pids;          // PIDs de los procesos hijos.
-    pid_t pgid;           // ID de grupo.
     int id;
     job_state state;
-    int nprocceses;
     int background;
     int priority;        
+    pid_t pgid;                     // ID de grupo.
     char *cmdline;
+    struct pid_array pids;          // PIDs de los procesos hijos.
     struct _job_desc* next;
     
 } job_t, *job_llist;

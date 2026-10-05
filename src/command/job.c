@@ -14,7 +14,7 @@ int job_add(job_t j) {
 
     //----  copiar contenidos ----
     new->background = j.background;
-    new->nprocceses = j.nprocceses;
+    new->pids.data = j.pids.data;
     new->pgid = j.pgid;
     new->state = j.state;
     new->next = NULL;
@@ -24,9 +24,9 @@ int job_add(job_t j) {
 
     new->cmdline = strdup(j.cmdline);
 
-    sz = sizeof(pid_t) * j.nprocceses;
-    new->pids = malloc(sz);
-    memcpy(new->pids, j.pids, sz);
+    sz = sizeof(pid_t) * j.pids.count;
+    new->pids.data = malloc(sz);
+    memcpy(new->pids.data, j.pids.data, sz);
 
 
     if (g_bgjob_list == NULL) {
@@ -54,7 +54,7 @@ int job_add(job_t j) {
 static void job_free(job_t* j) {
     if(!j) return;
     if(j->cmdline)free(j->cmdline);
-    if(j->pids)free(j->pids);
+    if(j->pids.data)free(j->pids.data);
     free(j);
 }
 
@@ -99,9 +99,9 @@ job_t* job_get(pid_t pgid) {
     if (g_bgjob_list == NULL) return r;
     c = g_bgjob_list;
     do {
-        for (int i = 0; i < c->nprocceses; i++)
+        for (int i = 0; i < c->pids.count; i++)
         {
-            if (c->pids[i] == pgid)return c;
+            if (c->pids.data[i] == pgid)return c;
         }
         c = c->next;
         
@@ -182,7 +182,7 @@ void job_print(job_t* j, FILE* stream, char priority){
  * @note se lee /proc/[pgid]/stat para obtener el estado y detectar cambios.
  */
 job_state job_get_status(pid_t pgid) {
-    FILE *f;
+    int fd;
     char s[20];
     char buff[256];
     char* ptr;
@@ -192,15 +192,18 @@ job_state job_get_status(pid_t pgid) {
     job_t* job;
 
     sprintf(s, "/proc/%d/stat", pgid);
-    f = fopen(s, "r");
-    if (!f) {
+    fd = open("r", O_RDONLY);
+    if (fd < 0) {
         
         ERROR("Couldn't get <%d>'s status: %s", pgid, strerror(errno));
         return -1;
     }
     memset(buff, 0, (size_t)256);
-    fgets(buff, 256, f);
-    if ((sz = strlen(buff)) == 0) {return -1;}
+    read(fd, buff, 256);
+    close(fd);
+    if ((sz = strlen(buff)) == 0) {
+        return -1;
+    }
 
     ptr = strchr(buff, ' ');
     idx = (size_t)(ptr - buff);

@@ -177,11 +177,11 @@ redirs:
         memset(scratch3, 0, buff_sz);
         strcat(buff, scratch2);
 
-        // print right side depending on redir kind
+        // print right side depending on redir target_kind
         memset(scratch2, 0, buff_sz);
 
-        switch (rd->kind) {
-            case REDIR_FILE:
+        switch (rd->target_kind) {
+            case REDIR_TARGET_FILE:
                 sprintf(scratch2, "file=\"%s\"\n", rd->target.filename);
                 break;
 

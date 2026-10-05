@@ -337,7 +337,7 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     char** exp_args = NULL;
     int err = 0;
     pid_t pid = 0;
-    job_t* job;
+    job_t* job = NULL;
     int status;
     bool need_free = 0;
 
@@ -400,9 +400,9 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     tcsetpgrp(STDIN_FILENO, pid);
 
     // Esperar a que termine.
-    for (int i = 0; i < job->nprocceses; i++)
+    for (int i = 0; i < job->pids.count; i++)
     {
-        waitpid(job->pids[i], &status, WUNTRACED);
+        waitpid(job->pids.data[i], &status, WUNTRACED);
         INFO("st: %d: stopped?: %d", status, WIFSTOPPED(status));
         // Si se vuelve a detener.
         if (WIFSTOPPED(status)) {

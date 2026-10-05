@@ -41,7 +41,6 @@ builtin_t g_builtin_function_table[] = {
 
 
 
-
 /**
  * @brief Instalar señales.
  */

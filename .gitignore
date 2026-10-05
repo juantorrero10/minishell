@@ -2,5 +2,6 @@ ejemplo_minishell
 build
 other
 deprecated.txt
+notes.txt
 .vscode
 src/command/execute_old.cc

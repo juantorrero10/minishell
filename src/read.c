@@ -24,78 +24,78 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     buff_len = strlen(buff);
     remaining= INPUT_LINE_MAX - (buff_len + 1);
     // Ignorar lineas que no acaban en '\n' o que empiezan con '#' (comentarios)
-    if (buff[buff_len - 1] == '\n' && buff[0] != '#') {
-        buff[buff_len - 1] = '\0';
-        buff_len--;
-        total = buff_len;
-        remaining++;
-        
-        // Permitir varias lineas con '\'
-        while (buff[total - 1] == '\\' && remaining > 0) {
-            if (print_prompt) {
-                M_COLOR_GREY(stdout);
-                fprintf(stdout, ">\t\t\t\t");
-                M_COLOR_RESET(stdout);
-            }
-            // Eliminar la barra invertida
-            buff[total - 1] = '\0';
-            buff_len--; total--; remaining++;
-            // Obtener siguiente linea
-            fgets(buff2, remaining, stdin);
-            buff_len = strlen(buff2);
-            
-            if (buff2[buff_len - 1] == '\n') {
-                buff2[buff_len - 1] = '\0';
-                buff_len--;
-                strcat(buff, buff2);
-                memset(buff2, 0, remaining);
-                remaining -= buff_len;
-                total += buff_len;
-            } else {    //un SIGINT
-                fputc('\n', stdout);
-                return 0;
-            }
-        }
-
-        // tokenizar
-        //line = tokenize(buff);
-        ast_t* a = parse_string(buff);
-        if (a != NULL) {
-
-            // expandir variables de entorno y juntar argumentos entre comillas
-            // expanded = env_expand_wholeline(line);
-            // join_quoted_arguments(expanded);
-
-            // ejecutar commando.
-            ret = execute_line(a, buff);
-            
-            // Actualizar el último codigo de error. $STATUS
-            g_last_error_code = ret;
-            setenv("PREV", buff, 1);
-            sprintf(buff, "%d", ret);
-            setenv("STATUS", buff, 1);
-            
-
-            ast_free(a);
-
-            // señal de salida = 1 -> salir de la shell con código ret.
-            if (g_exit_signal == 1) {
-                INFO("exit signal=1");
-                exit(ret);
-            }
-            // señal de salida = 2 -> se ha cancelado el diálogo de salida.
-            if (g_exit_signal == 2) {
-                fputc('\n', stdout);
-                g_exit_signal = 0;
-                INFO("end, signal=2");
-                return ret;
-            }
-            INFO("end");
-            return ret;
-        }
-        return -1;
-    } else {
+    if (buff[buff_len - 1] != '\n' || buff[0] == '#') 
+    {
         fputc('\n', stdout);
         return 0;
     }
+    buff[buff_len - 1] = '\0';
+    buff_len--;
+    total = buff_len;
+    remaining++;
+    
+    // Permitir varias lineas con '\'
+    while (buff[total - 1] == '\\' && remaining > 0) {
+        if (print_prompt) {
+            M_COLOR_GREY(stdout);
+            fprintf(stdout, ">\t\t\t\t");
+            M_COLOR_RESET(stdout);
+        }
+        // Eliminar la barra invertida
+        buff[total - 1] = '\0';
+        buff_len--; total--; remaining++;
+        // Obtener siguiente linea
+        fgets(buff2, remaining, stdin);
+        buff_len = strlen(buff2);
+        
+        if (buff2[buff_len - 1] == '\n') {
+            buff2[buff_len - 1] = '\0';
+            buff_len--;
+            strcat(buff, buff2);
+            memset(buff2, 0, remaining);
+            remaining -= buff_len;
+            total += buff_len;
+        } else {    //un SIGINT
+            fputc('\n', stdout);
+            return 0;
+        }
+    }
+
+    // tokenizar
+    //line = tokenize(buff);
+    ast_t* a = parse_string(buff);
+    if (a != NULL) {
+
+        // expandir variables de entorno y juntar argumentos entre comillas
+        env_expand_ast(a);
+        // join_quoted_arguments(expanded);
+
+        // ejecutar commando.
+        ret = execute_line(a, buff);
+        
+        // Actualizar el último codigo de error. $STATUS
+        g_last_error_code = ret;
+        setenv("PREV", buff, 1);
+        sprintf(buff, "%d", ret);
+        setenv("STATUS", buff, 1);
+        
+
+        ast_free(a);
+
+        // señal de salida = 1 -> salir de la shell con código ret.
+        if (g_exit_signal == 1) {
+            INFO("exit signal=1");
+            exit(ret);
+        }
+        // señal de salida = 2 -> se ha cancelado el diálogo de salida.
+        if (g_exit_signal == 2) {
+            fputc('\n', stdout);
+            g_exit_signal = 0;
+            INFO("end, signal=2");
+            return ret;
+        }
+        INFO("end");
+        return ret;
+    }
+    return -1;
 }

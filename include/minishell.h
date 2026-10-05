@@ -23,7 +23,6 @@
 #include <fcntl.h>
 
 #include <parser/public.h>
-#include <tempparser.h>
 
 #include <macros.h>
 #include <prompt.h>

@@ -11,10 +11,8 @@
 /**
  * @brief Obtener cadena del nombre del usuario.
  */
-static void get_username(char** out) {
-    size_t len = 0;
-
-    *out = env_get_var("USER", &len);
+static inline void get_username(char** out) {
+    *out = getenv("USER");
 }
 
 int prompt_get_last_errorcode() { return g_last_error_code;}
@@ -33,7 +31,7 @@ void prompt_print_cwd(bool abrv_home) {
     // Sustituir /home/{user} con ~
     if (abrv_home)
     {
-        strcpy(home, env_get_var("HOME", &sz_home));
+        strcpy(home, getenv("HOME"));
 
         // Si la subcadena /home/{user} esta al principio de la ruta ->
         if (strncmp(pwd, home, sz_home) == 0) {

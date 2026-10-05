@@ -1,7 +1,7 @@
 #include <minishell.h>
 #include <parser/public.h>
 
-int get_internal_idx(char* argv0) {
+int eu_get_internal_idx(char* argv0) {
     int idx = 0;
     builtin_t* curr = g_builtin_function_table;
 
@@ -17,7 +17,7 @@ int get_internal_idx(char* argv0) {
     
 }
 
-size_t get_npids(ast_t* tree, bool simple) {
+size_t eu_lookahead_get_npids(ast_t* tree, bool simple) {
     if (!tree) return 0;
     switch (tree->type)
     {
@@ -28,19 +28,19 @@ size_t get_npids(ast_t* tree, bool simple) {
     case AST_PIPELINE:
         return tree->node.ppl.nelements;
     case AST_GROUP:
-        return get_npids(tree->node.grp.children, true);
+        return eu_lookahead_get_npids(tree->node.grp.children, true);
     case AST_BG:
-        return get_npids(tree->node.bg.children, false);
+        return eu_lookahead_get_npids(tree->node.bg.children, false);
     case AST_LIST:
-        return get_npids(tree->node.sep.left, simple) + 
-            get_npids(tree->node.sep.right, simple);
+        return eu_lookahead_get_npids(tree->node.sep.left, simple) + 
+            eu_lookahead_get_npids(tree->node.sep.right, simple);
     default:
         return 0;
     }
 }
 
 
-int handle_redirection(ast_node_redir_t* rd) {
+int eu_handle_redirection(ast_node_redir_t* rd) {
     int new_fd = 0;
 
     //Default mask and mode values
@@ -49,16 +49,16 @@ int handle_redirection(ast_node_redir_t* rd) {
 
     switch (rd->op)
     {
-    case TOK_REDIR_IN:
+    case REDIR_IN:
         flag_mask = O_RDONLY;
         goto L1;
-    case TOK_REDIR_OUT_APPEND:
+    case REDIR_OUT_APPEND:
         flag_mask = O_CREAT | O_APPEND | O_WRONLY;
         goto L1;
-    case TOK_REDIR_READ_WRITE:
+    case REDIR_READ_WRITE:
         flag_mask = O_CREAT | O_RDWR;
         goto L1;
-    case TOK_REDIR_OUT:
+    case REDIR_OUT:
 L1:
         if (!(flag_mask & O_CREAT)) {
             mode_mask = umask(0);
@@ -72,9 +72,9 @@ L1:
         dup2(new_fd, rd->left_fd);
         close(new_fd);
         break;
-    case TOK_REDIR_DUP_IN:
-    case TOK_REDIR_DUP_OUT:
-        if (rd->kind == REDIR_CLOSE) {
+    case REDIR_DUP_IN:
+    case REDIR_DUP_OUT:
+        if (rd->target_kind == REDIR_TARGET_CLOSE) {
             if (close(rd->left_fd) == -1) {
                 g_abort_execution = 1;
                 return EXIT_ERROR_CLOSING_FD;

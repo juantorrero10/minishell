@@ -1,4 +1,4 @@
-#include <mshparser.h>
+#include <private.h>
 #include <test/test_ast.h>
 
 /**

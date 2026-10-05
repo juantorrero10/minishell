@@ -1,4 +1,4 @@
-#include <mshparser.h>
+#include <private.h>
 
 void scanner_init(scanner *s, char *input) {
     s->buf = input;

@@ -1,7 +1,7 @@
 #ifndef PARSER_TEST_TEST_AST_H_
 #define PARSER_TEST_TEST_AST_H_
 
-#include <mshparser.h>
+#include <private.h>
 #include <../colors.h>
 
 

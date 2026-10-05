@@ -1,11 +1,11 @@
-#include <mshparser.h>
+#include <private.h>
 #include <../log.h>
 
 int g_abort_ast = 0;
 
 
 // forward declaration.
-static ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at);
+static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* locate_at);
 
 /**
  * @brief parse redirections.
@@ -24,7 +24,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
     int rd_idx   = 0;
     int end_last = 0;
     bool last    = 0;
-    typeof_token bef, aft; (void)bef; (void)aft;
+    token_kind bef, aft; (void)bef; (void)aft;
     char* ptr = (char*)cmdline; //Make the compiler happy
 
     if (!__nredirs || !*__nredirs) {
@@ -52,11 +52,11 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
      * Redit herestr:   <fd=0> '<<<' <str+>
     */
 
-    while(!last_token(arr, idx)) {
+    while(!is_last_token(arr, idx)) {
         curr_rd = redir_arr + curr;
         //Skip until next redir token
-        while(get_category(tok_type(arr, idx)) != TC_REDIR && !last_token(arr, idx)) idx++;
-        if (last_token(arr, idx)) last = 1;
+        while(categorize_token(tok_type(arr, idx)) != TC_REDIR && !is_last_token(arr, idx)) idx++;
+        if (is_last_token(arr, idx)) last = 1;
         bef = tok_type(arr, idx-1);
         aft = tok_type(arr, idx+1);
         switch (tok_type(arr, idx))
@@ -76,7 +76,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
                 }
             
             rd_idx = idx;
-            curr_rd->kind = REDIR_FILE;
+            curr_rd->target_kind = REDIR_TARGET_FILE;
             get_word(arr, idx+1, &curr_rd->target.filename);
             //Skip until end of quotes
             if (tok_type(arr, idx+1) == TOK_DQ_START) {
@@ -103,10 +103,10 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
                 }
             rd_idx = idx;
             if (tok_type(arr, idx+1) == TOK_REDIR_RHS_CLOSE) {
-                curr_rd->kind = REDIR_CLOSE; break;
+                curr_rd->target_kind = REDIR_TARGET_CLOSE; break;
             }
             
-            curr_rd->kind = REDIR_FD;
+            curr_rd->target_kind = REDIR_TARGET_FD;
             curr_rd->target.fd = arr->ptr[idx+1].number;
             break;
         
@@ -124,8 +124,8 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
                 }
             rd_idx = idx;
             if (tok_type(arr, idx) == TOK_REDIR_HEREDOC)
-                curr_rd->kind = REDIR_HEREDOC;
-            else curr_rd->kind = REDIR_HERESTR;
+                curr_rd->target_kind = REDIR_TARGET_HEREDOC;
+            else curr_rd->target_kind = REDIR_TARGET_HERESTR;
             get_word(arr, idx+1, &curr_rd->target.filename);
             //Skip until end of quotes
             if (tok_type(arr, idx+1) == TOK_DQ_START) {
@@ -147,7 +147,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
         if (rd_idx <= end_last)
             curr_rd->left_fd = redir_default_fd(tok_type(arr, rd_idx)); //default val
         else curr_rd->left_fd = arr->ptr[rd_idx-1].number;                
-        curr_rd->op = tok_type(arr, rd_idx);
+        curr_rd->op = (redir_kind)tok_type(arr, rd_idx);
         idx = idx + 2;
         end_last = idx;
 
@@ -161,6 +161,12 @@ __redir_abort:
     free(redir_arr);
     return NULL;
 }
+
+#define CHECK_ABORT(ret) \
+    if (g_abort_ast) {\
+        ast_free((ret));\
+        return NULL;\
+    }\
 
 /**
  * @brief parse one command. 
@@ -199,11 +205,11 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     cmd.argv = NULL;
 
     idx_redir = find_redirs(arr, cmdline, &nredirs);
-    if (g_abort_ast) {ast_free(ret); return NULL;}
+    CHECK_ABORT(ret);
     if (nredirs) {
         view = make_arr_view(arr, idx_redir, __INT32_MAX__);
         cmd.redirs = parse_redirections(&view, cmdline, &nredirs);
-        if (g_abort_ast) {ast_free(ret); return NULL; }
+        CHECK_ABORT(ret);
         cmd.nredirs = nredirs;
     }
 
@@ -213,16 +219,16 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     if (idx_cmdsub != -1) {
         // abort because they are not supported yet.
         ast_free(ret);
+        ret = NULL;
         error_parse(ERR_UNEXP, ptr + strloc(arr, idx_cmdsub));
         error_clarify("Cmd subtitutions are not supported yet.");
         g_abort_ast = 1;
-        free(ret);
         return NULL;
     }
 
     // STEP 1: Figure out how many args the command will have.
     // Count each word. If quoted start count just one until quotes end.
-    while (tok_type(arr, idx) != TOK_EOL && idx < (int)arr->occupied) {
+    while (tok_type(arr, idx) != TOK_EOL && idx < (int)arr->count) {
         if (tok_type(arr, idx) == TOK_DQ_START) {
             //skip until DQ_END
             while(tok_type(arr, idx) != TOK_DQ_END) idx++;
@@ -230,7 +236,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
         }
         else if (tok_type(arr, idx) == TOK_WORD) argc++;
         // Stop when encounter a redir
-        else if (get_category(tok_type(arr, idx)) == TC_REDIR || tok_type(arr, idx) == TOK_REDIR_LHS_FD) {break;}
+        else if (categorize_token(tok_type(arr, idx)) == TC_REDIR || tok_type(arr, idx) == TOK_REDIR_LHS_FD) {break;}
         // Error if other thing (Im not sure if this is ever going to be true).
         else {error_parse(ERR_UNEXP, ptr + strloc(arr, idx)); if(!locate_at)free(ret); g_abort_ast = 1; return NULL;}
         idx++;
@@ -243,7 +249,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     cmd.argv[argc] = NULL;
     idx = 0;
     argc = 0;
-    while (tok_type(arr, idx) != TOK_EOL && idx < (int)arr->occupied)
+    while (tok_type(arr, idx) != TOK_EOL && idx < (int)arr->count)
     {
         if (tok_type(arr, idx) == TOK_WORD) {
             cmd.argv[argc] = strdup(arr->ptr[idx].value);
@@ -256,7 +262,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
             total_len = 0;
             j = idx + 1;
             /* compute required length */
-            while (tok_type(arr, j) != TOK_DQ_END && j < (int)arr->occupied) {
+            while (tok_type(arr, j) != TOK_DQ_END && j < (int)arr->count) {
                 if (tok_type(arr, j) == TOK_WORD && arr->ptr[j].value)
                     total_len += strlen(arr->ptr[j].value) + 1; /* +1 for possible space */
                 j++;
@@ -269,7 +275,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
                 p = 0;
                 first = 1;
                 j = idx + 1;
-                while (tok_type(arr, j) != TOK_DQ_END && j < (int)arr->occupied) {
+                while (tok_type(arr, j) != TOK_DQ_END && j < (int)arr->count) {
                     if (tok_type(arr, j) == TOK_WORD && arr->ptr[j].value) {
                         if (!first) buf[p++] = ' ';
                         l = strlen(arr->ptr[j].value);
@@ -324,8 +330,8 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
 
     //Get group end
     //By this point is guaranteed to have a closing token.
-    idx = arr->occupied - 1;
-    while (get_category(tok_type(arr, idx)) != TC_GROUP_END && idx >= 0) idx--;
+    idx = arr->count - 1;
+    while (categorize_token(tok_type(arr, idx)) != TC_GROUP_END && idx >= 0) idx--;
     idx++;
     
 
@@ -335,19 +341,16 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
         if (tok_type(arr, idx-2) != TOK_SEMI) {
             error_parse(ERR_EXP, "Expected ';' -> { ...  ; }");
             fprintf(stderr,      "                              HERE  ^ \n");
-            g_abort_ast = 1;
-            free(ret);
-            return NULL;
+            goto __group_abort;
         }
     }
 
     //Get redirections.
-    if (!last_token(arr, idx)) {
+    if (!is_last_token(arr, idx)) {
         if (find_redirs(arr, cmdline, &n_red) == -1) {
             // Not sure if this will ever trigger but it doesnt hurt to check.
             error_parse(ERR_UNEXP, ptr + strloc(arr, idx+1));
-            g_abort_ast = 1; free(ret);
-            return NULL;
+            goto __group_abort;
         }
         view = make_arr_view(arr, idx, __INT32_MAX__);
         grp.redirs = parse_redirections(&view, cmdline, &n_red);
@@ -355,9 +358,14 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
     }
     //Parse children
     view = make_arr_view(arr, 1, idx-2);
-    grp.children = parse_line(&view, cmdline, NULL);
+    grp.children = parse_generic(&view, cmdline, NULL);
     ret->node.grp = grp;
+
     return ret;
+__group_abort:
+    ast_free(ret);
+    g_abort_ast = 1;
+    return NULL;
 }
 
 static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
@@ -378,28 +386,31 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
 
     //Especial case ; at the end of a element -> no separation.
     if (semi) {
-        if (arr->ptr[arr->occupied-1].type == TOK_EOL && 
-            arr->ptr[arr->occupied-2].type == TOK_SEMI) {
+        if (arr->ptr[arr->count-1].type == TOK_EOL && 
+            arr->ptr[arr->count-2].type == TOK_SEMI) {
             temp = 3; semi_end = 1;
-        } else if (arr->ptr[arr->occupied-1].type == TOK_SEMI) {
+        } else if (arr->ptr[arr->count-1].type == TOK_SEMI) {
             temp = 2; semi_end = 1;
         }
         if (semi_end) {
-            view_left = make_arr_view(arr, 0, arr->occupied-temp);
-            free(ret);
-            return parse_line(&view_left, cmdline, NULL);
+            view_left = make_arr_view(arr, 0, arr->count - temp);
+            ast_free(ret);
+            return parse_generic(&view_left, cmdline, NULL);
         }
     }
 
     ret->type = AST_LIST;
-    sep.sep_type = tok_type(arr, idx);
+    sep.sep_type = (separator_kind)tok_type(arr, idx);
     view_left = make_arr_view(arr, 0, idx - 1);
-    view_right = make_arr_view(arr, idx+1, arr->occupied - 1);
-    sep.left = parse_line(&view_left, cmdline, NULL);
-    sep.right = parse_line(&view_right, cmdline, NULL);
+    view_right = make_arr_view(arr, idx+1, arr->count - 1);
+    sep.left = parse_generic(&view_left, cmdline, NULL);
+    sep.right = parse_generic(&view_right, cmdline, NULL);
     if (g_abort_ast) {
-        ast_free(sep.left); ast_free(sep.right);
-        free(ret);
+        ast_free(sep.left);
+        ast_free(sep.right);
+        sep.left = NULL;
+        sep.right = NULL;
+        ast_free(ret);
         return NULL;
     }
     ret->node.sep = sep;
@@ -408,11 +419,11 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
 
 static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     ast_t* ret = ast_create_empty();    // Defaults to 
-    ast_t* temp;
+    ast_t* temp = NULL;
     ast_node_pipeline_t ppl = (ast_node_pipeline_t){0};
-    token_arr view;
-    token_cat tc;
-    typeof_token tt;
+    token_arr view = {0};
+    token_category tc;
+    token_kind tt;
     char *ptr           = (char*) cmdline;
     int ppl_end         = 0;
     int idx             = 0;
@@ -423,27 +434,27 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     bool group_element  = 0; (void) group_element;
     // tokens allowed in a pipeline (using this to delimit the pipeline) + redirs
     // size: 6
-    typeof_token allowed[] = {TOK_WORD, 
+    token_kind allowed[] = {TOK_WORD, 
         TOK_PIPE, TOK_DQ_START, TOK_DQ_END, TOK_CMD_ST_START, TOK_CMD_ST_END};
     int cmd_sub = 0;
 
     ret->type = AST_PIPELINE;
     
     // grammar rule: if not in a cmd sub, only tokens in [allowed] are valid.
-    while (!last_token(arr, idx-1)) 
+    while (!is_last_token(arr, idx-1)) 
     {
         after_pipe = 0;
         tt = tok_type(arr, idx);
-        tc = get_category(tt);
+        tc = categorize_token(tt);
         if (tt == TOK_CMD_ST_START) cmd_sub++;
         if (tt == TOK_CMD_ST_END) cmd_sub--;
-        if (tt == TOK_PIPE) {n_pipes++; after_pipe = 1; tt = tok_type(arr, ++idx); tc = get_category(tt);}
+        if (tt == TOK_PIPE) {n_pipes++; after_pipe = 1; tt = tok_type(arr, ++idx); tc = categorize_token(tt);}
 
         // Allow groups just after pipe of if fisrt token
         if (!cmd_sub && ( !idx || after_pipe)) {
             if (tc == TC_GROUP_START) {
                 //Skip until group end
-                while (get_category(tt) != TC_GROUP_END) { tt = tok_type(arr, idx++); }
+                while (categorize_token(tt) != TC_GROUP_END) { tt = tok_type(arr, idx++); }
                 after_pipe = 0;
                 continue;
             }
@@ -479,14 +490,14 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
 
             view = make_arr_view(arr, cmd_st, cmd_end);
             // Only allowing simple commands in pipelines.
-            temp = parse_line(&view, cmdline, NULL);
+            temp = parse_generic(&view, cmdline, NULL);
             
             if (g_abort_ast || !temp) {
                 if (ppl.elements)free(ppl.elements);
                 goto abort_ppl;
 
             }
-            memcpy(ppl.elements + ppl.ncommands++, temp, sizeof(ast_t));
+            memcpy(ppl.elements + ppl.nelements++, temp, sizeof(ast_t));
             free(temp);
             cmd_st = idx + 1;
             cmd_end = cmd_st;
@@ -511,7 +522,7 @@ abort_ppl:
  * its cascades down from more complex to more simple.
  * @note operates under assumption of a well tokenized and balanced input.
  */
-ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
+static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
     // HIGHER LEVEL
     // 0. background flag
     // 1. parse_list
@@ -529,14 +540,14 @@ ast_t* parse_line(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
     // Reset abort signal
     g_abort_ast = 0;
 
-    if (arr->occupied == 0) return NULL;
+    if (arr->count == 0) return NULL;
 
     // Background flag
-    if (arr->ptr[arr->occupied-2].type == TOK_AMP) {
+    if (arr->ptr[arr->count-2].type == TOK_AMP) {
         ret = ast_create_empty();
         ret->type = AST_BG;
-        view = make_arr_view(arr, 0, arr->occupied-3);
-        bg.children = parse_line(&view, cmdline, locate_at);
+        view = make_arr_view(arr, 0, arr->count-3);
+        bg.children = parse_generic(&view, cmdline, locate_at);
         ret->node.bg = bg; return ret;
     }
 
@@ -573,6 +584,11 @@ ast_t* parse_string(char* cmdline) {
     char* trim_chars = "\t\r\n ";
     ast_t* result = NULL;
 
+    // Check for nullplr or empty cmdline
+    if (!cmdline || !(cmdline[0])) {
+        return result;
+    }
+
     sz = strlen(cmdline);
     INFO("received: %s", cmdline);
     //trim characters
@@ -586,16 +602,16 @@ ast_t* parse_string(char* cmdline) {
     
 
     if (pu_check_balance(cmdline, strlen(cmdline)))return NULL;
-    arr = __tokenize(cmdline, &sz);
+    arr = tokenize(cmdline, &sz);
     if (sz) goto clean_exit;
     pu_peek(&arr);
 
-    result = parse_line(&arr, cmdline, NULL);
+    result = parse_generic(&arr, cmdline, NULL);
     if (!result) {
         WARN("parser aborted");
     }
 
 clean_exit:
-    free_token_arr(&arr);
+    token_arr_free(&arr);
     return result;
 }

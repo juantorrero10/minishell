@@ -1,10 +1,13 @@
-#include <mshparser.h>
+#include <private.h>
 #include <../log.h>
+
+
 
 ast_t* ast_create_empty() {
     ast_t* ret = malloc(sizeof(ast_t));
     memset(ret, 0, sizeof(ast_t));
-    ret->type = AST_INVALID; return ret;
+    ret->type = AST_INVALID; 
+    return ret;
 }
 
 ast_t* ast_create_array(size_t n_trees) {
@@ -15,8 +18,10 @@ ast_t* ast_create_array(size_t n_trees) {
     return t;
 }
 
+static void ast_free_contents(ast_t* t);
+
 static void ast_free_redir(ast_node_redir_t rd) {
-    if (rd.kind != REDIR_FD && rd.kind != REDIR_CLOSE) {
+    if (rd.target_kind != REDIR_TARGET_FD && rd.target_kind != REDIR_TARGET_CLOSE) {
         if (rd.target.filename) free(rd.target.filename);
     }
 }
@@ -51,22 +56,21 @@ static void ast_free_command(ast_node_command_t* c) {
 static void ast_free_pipeline(ast_node_pipeline_t* ppl) {
     ast_t* elem; (void) elem;
 
-    for (size_t i = 0; i < ppl->ncommands; i++)
+    for (size_t i = 0; i < ppl->nelements; i++)
     {
         elem = ppl->elements + i;
-        ast_free(ppl->elements + i);
+        ast_free_contents(ppl->elements + i);
     }
     free(ppl->elements);
 }
 
-void ast_free(ast_t* t) {
+static void ast_free_contents(ast_t* t) {
     if (!t) return;
     switch (t->type)
     {
     case AST_BG:
         if (t->node.bg.children) {
             ast_free(t->node.bg.children);
-            free(t->node.bg.children);
         }
         break;
     case AST_COMMAND:
@@ -82,11 +86,10 @@ void ast_free(ast_t* t) {
     case AST_SUBSHELL:
         if (t->node.grp.children) {
             ast_free(t->node.grp.children);
-            free(t->node.grp.children);
             /* don't free t->node.grp.children pointer here — caller will if it's a heap ptr */
         }
         if (t->node.grp.redirs) {
-            // free array of redirs if allocated (adjust per your definitions)
+            // free array of redirs if capacity (adjust per your definitions)
             for (size_t i = 0; i < t->node.grp.nredirs; i++)
                 ast_free_redir(t->node.grp.redirs[i]);
             
@@ -98,14 +101,19 @@ void ast_free(ast_t* t) {
     case AST_SUBST:
         if (t->node.sub.children) {
             ast_free(t->node.sub.children);
-            free(t->node.sub.children);
         }
         break;
     case AST_LIST:
-        if (t->node.sep.left)  { ast_free(t->node.sep.left);  free(t->node.sep.left);  }
-        if (t->node.sep.right) { ast_free(t->node.sep.right); free(t->node.sep.right); }
+        if (t->node.sep.left)  { ast_free(t->node.sep.left);}
+        if (t->node.sep.right) { ast_free(t->node.sep.right); }
         break;
+    case AST_INVALID:
     default:
         break;
     }
+}
+
+void ast_free(ast_t* t) {
+    ast_free_contents(t);
+    free(t);
 }
