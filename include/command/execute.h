@@ -23,7 +23,10 @@ struct file_streams {
     FILE* err;
 };
 
-int execute_line(ast_t* tree, const char* cmdline);
+typedef int error_t;
+typedef int cmd_exit_t;
+
+cmd_exit_t execute_line(ast_t* tree, const char* cmdline);
 
 // Flag para controlar los saltos de linea.
 extern bool g_dont_nl;

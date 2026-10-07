@@ -66,7 +66,7 @@ static size_t expansion_pass(const char* og, char* new, bool fill_buff) {
  * @return cadena con las variables expandidas.
  * @note se debe liberar el puntero tras su uso.
  */
-static char* env_expand_string(const char* og) {
+char* env_expand_string(const char* og) {
     char* ret = NULL;
     
     // First pass: figure out allocation size

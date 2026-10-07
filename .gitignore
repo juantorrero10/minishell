@@ -5,3 +5,4 @@ deprecated.txt
 notes.txt
 .vscode
 src/command/execute_old.cc
+src/command/.execute.cc

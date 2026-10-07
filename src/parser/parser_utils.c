@@ -160,7 +160,6 @@ token_category categorize_token(token_kind tt) {
     switch (tt)
     {
     case TOK_AMP:
-        return TC_BG;
     case TOK_AND_IF:
     case TOK_OR_IF:
     case TOK_SEMI:
@@ -214,7 +213,7 @@ token_category categorize_token(token_kind tt) {
  */
 token_arr make_arr_view(token_arr* arr, size_t start, size_t end) {
     token_arr ret = (token_arr){0};
-    if (end == __INT32_MAX__) end = arr->count - 1;
+    if (end == __SIZE_MAX__) end = arr->count - 1;
 
     if (start > end) {return (token_arr){NULL, 0, 0};}
 

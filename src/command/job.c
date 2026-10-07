@@ -6,28 +6,25 @@
  * @param j trabajo a añadir.
  * @return int ID del trabajo añadido.
  */
-int job_add(job_t j) {
+int job_add(const job_t* j) {
     job_t* new = malloc(sizeof(job_t));
-    size_t sz = 0;
     job_t* curr, *prev;
     int highest = 0;
 
     //----  copiar contenidos ----
-    new->background = j.background;
-    new->pids.data = j.pids.data;
-    new->pgid = j.pgid;
-    new->state = j.state;
+    new->background = j->background;
+    new->pids.count = j->pids.count;
+    new->pipe = j->pipe;
+    new->pgid = j->pgid;
+    new->state = j->state;
     new->next = NULL;
     new->priority = 0;
     new->id = 1;
     
 
-    new->cmdline = strdup(j.cmdline);
-
-    sz = sizeof(pid_t) * j.pids.count;
-    new->pids.data = malloc(sz);
-    memcpy(new->pids.data, j.pids.data, sz);
-
+    new->cmdline = strdup(j->cmdline);
+    new->pids.data = calloc((size_t)j->pids.count, sizeof(pid_t));
+    memcpy(new->pids.data, j->pids.data, (size_t)j->pids.count * sizeof(pid_t));
 
     if (g_bgjob_list == NULL) {
         g_bgjob_list = new;
@@ -53,7 +50,7 @@ int job_add(job_t j) {
 // Liberar memoria de un objeto job.
 static void job_free(job_t* j) {
     if(!j) return;
-    if(j->cmdline)free(j->cmdline);
+    if(j->cmdline)free((void*)j->cmdline);
     if(j->pids.data)free(j->pids.data);
     free(j);
 }
@@ -152,6 +149,7 @@ static void str_state(job_state s, char* buff) {
     case RUNNING:       strcpy(buff, "Running");break;
     case STOPPED:       strcpy(buff, "Stopped");break;
     case DONE:          strcpy(buff, "Done");break;
+    case SLEEPING:      strcpy(buff, "Sleeping");break;
     default:
         strcpy(buff, "Unknown");break;
     }
@@ -192,11 +190,11 @@ job_state job_get_status(pid_t pgid) {
     job_t* job;
 
     sprintf(s, "/proc/%d/stat", pgid);
-    fd = open("r", O_RDONLY);
+    fd = open(s, O_RDONLY);
     if (fd < 0) {
         
         ERROR("Couldn't get <%d>'s status: %s", pgid, strerror(errno));
-        return -1;
+        return DONE;
     }
     memset(buff, 0, (size_t)256);
     read(fd, buff, 256);
@@ -210,13 +208,16 @@ job_state job_get_status(pid_t pgid) {
     ptr = strchr(buff + idx + 1, ' ');
     idx = (size_t)(ptr - buff);
     state = buff[idx + 1];
+    INFO("STATE: '%c'", state);
     switch (state)
     {
-    case 'S':
     case 'R':
         return RUNNING;
     case 'T':
         return STOPPED;
+    case 'S':
+    case 'D':
+        return SLEEPING;
     default:
         job = job_get(pgid);
         if (job)job->priority = 0;
@@ -255,4 +256,70 @@ void job_update_status() {
         INFO("job_checkupdate: %d -> %d", curr->state, cs);
         curr = curr->next;
     } while(curr);
+}
+
+/**
+ * @brief Esperar a la finalizacion o interrupción de un trabajo.
+ * @param j trabajo por el que esperar.
+ * @returns Código de error si < 0, Código de salida del trabajo.
+ */
+cmd_exit_t job_wait(job_t* j) {
+    int remaining = j->pids.count;
+    pid_t pid = 0;
+    int status = 0;
+    int ret = 0;
+    char* stopped_str = "";
+
+    if (j->background) {
+        j->state = RUNNING;
+__add_job_exit:
+        if (j->pgid != 0) {
+            j->id = job_add(j);
+            MSH_LOG("new job: [%d] %d %s", j->id, j->pgid, stopped_str);
+        } else {
+            MSH_ERR("Couldn't create job: '%s' job", j->cmdline);
+            return EXIT_ERROR_CREATING_JOB;
+        }
+        return 0;
+
+    }
+
+    tcsetpgrp(STDIN_FILENO, j->pgid);
+
+    while (remaining > 0) {
+        // Wait for any child to finish
+        pid = waitpid(-j->pgid, &status, WUNTRACED);
+        if (pid <= 0) {
+            if (errno == EINTR) continue;
+            break; // No more children
+        }
+
+        remaining--;
+
+        // If last PID
+        if (pid == j->pids.data[j->pids.count - 1]) {
+            if (WIFEXITED(status)) {
+                ret = WEXITSTATUS(status);
+            } else if WIFSIGNALED(status) {
+                ret = 128 + WTERMSIG(status);
+            }
+        }
+
+        if (WIFSTOPPED(status)) {
+            j->state = STOPPED;
+            j->background = true;
+            signal(SIGTTOU, SIG_IGN);
+            signal(SIGTTIN, SIG_IGN);
+            signal(SIGTSTP, SIG_IGN);
+            tcsetpgrp(STDIN_FILENO, getpid());
+            stopped_str = "(Stopped)";
+            goto __add_job_exit;
+        }
+    }
+
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
+    signal(SIGTSTP, SIG_IGN);
+    tcsetpgrp(STDIN_FILENO, getpid());
+    return ret;
 }

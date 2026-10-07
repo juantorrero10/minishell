@@ -7,6 +7,15 @@
 extern char** environ;
 extern size_t g_num_envvars;  // # de variables de entorno.
 
+
+/**
+ * @brief Expande las variables de entorno en una cadena.
+ * @param og cadena original.
+ * @return cadena con las variables expandidas.
+ * @note se debe liberar el puntero tras su uso.
+ */
+char* env_expand_string(const char* og);
+
 /**
  * @brief Expandir las variables del entorno en una linea de commandos entera.
  * @note Debido a la estructura del proyecto no se permiten variables del entorno 

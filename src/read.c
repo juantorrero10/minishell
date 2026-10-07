@@ -11,7 +11,9 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     int ret = 0;
 
     // Imprimir el "prompt"
-    if (print_prompt) {PROMPT_PRINT();}
+    if (print_prompt) {
+        PROMPT_PRINT();
+    }
     fgets(buff, max, stdin);
 
     /** Si hay un caracter '\n' al final significa que el usuario 

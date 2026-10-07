@@ -1,6 +1,8 @@
 #include <minishell.h>
 #include <parser/public.h>
 
+#include <sys/mman.h>
+
 int eu_get_internal_idx(char* argv0) {
     int idx = 0;
     builtin_t* curr = g_builtin_function_table;
@@ -37,6 +39,19 @@ size_t eu_lookahead_get_npids(ast_t* tree, bool simple) {
     default:
         return 0;
     }
+}
+
+int create_buff_fd(const char *content) {
+    int fd = memfd_create("minishell_heredoc", 0);
+    if (fd == -1) return -1;
+
+    if (content && content[0] != '\0') {
+        write(fd, content, strlen(content));
+    }
+
+    lseek(fd, 0, SEEK_SET);
+
+    return fd;
 }
 
 
@@ -87,6 +102,65 @@ L1:
             return EXIT_ERROR_DUPING_FD;
         } break;
     //todo: herestr and heredoc
+    case REDIR_HERESTR:
+        new_fd = create_buff_fd(rd->target.string);
+        if (new_fd < 0) {
+            MSH_ERR("couldn't create the herestr: %s", strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_HERESTR;
+        }
+        dup2(new_fd, 0);
+        close(new_fd);
+        break;
+    case REDIR_HEREDOC:
+        char* delim = rd->target.delimiter;
+        char* buffer = malloc(sizeof(char) * INPUT_LINE_MAX);
+        size_t curr = 0;
+        size_t cap = INPUT_LINE_MAX;
+        char line_buff[INPUT_LINE_MAX];
+        
+        while(1) {
+            bool free_buff = false;
+            M_COLOR_GREY(stdout);
+            fprintf(stdout, ">  ");
+            M_COLOR_RESET(stdout);
+            fgets(line_buff, INPUT_LINE_MAX, stdin);
+
+            size_t sz = strlen(line_buff);
+            char old_last = line_buff[sz - 1];
+            line_buff[sz - 1] = '\0';
+            if (!strcmp(delim, line_buff)) {
+                break;
+            }
+            line_buff[sz - 1] = old_last;
+            char* src = env_expand_string(line_buff);
+            if (!src) {
+                src = line_buff;
+            } else {
+                free_buff = true;
+                sz = strlen(src);
+            }
+            if (curr + sz >= cap) {
+                cap *= 2;
+                buffer = realloc(buffer, sizeof(char) * cap);
+            }
+            memcpy(&buffer[curr], src, sz);
+            curr += sz;
+            if (free_buff) {
+                free(src);
+            }
+        }
+        buffer[curr] = '\0';
+        new_fd = create_buff_fd(buffer);
+        if (new_fd < 0) {
+            MSH_ERR("couldn't create the heredoc: %s", strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_HERESTR;
+        }
+        dup2(new_fd, 0);
+        close(new_fd);
+        free(buffer);
+        break;
     default:
         MSH_ERR("unknown redirection type or not supported yet.");
         g_abort_execution = 1;

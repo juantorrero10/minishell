@@ -84,7 +84,7 @@ typedef struct {
     ast_t* children;
 } ast_node_substitution_t;
 
-typedef enum {SEP_AND = TT_AND_START, SEP_OR, SEP_SEMICOLON} separator_kind;
+typedef enum {SEP_AND = TT_AND_START, SEP_OR, SEP_SEMICOLON, SEP_AMP} separator_kind;
 typedef struct {
     separator_kind sep_type;          // type: {AND_IF, OR_IF, SEMI}
     ast_t *left;

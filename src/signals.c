@@ -11,7 +11,7 @@ void sigint_handler(int sig) {
  * @brief Handler de SIGCHLD (creación de un proceso hijo) con fork();
  * Marca los trabajos como DONE cuando todos sus procesos hijos han terminado.
  */
-void sigchld_handler(int sig) {
+ void sigchld_handler(int sig) {
     pid_t pid;
     int status;
     bool all_done;

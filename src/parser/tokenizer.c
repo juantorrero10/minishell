@@ -385,18 +385,19 @@ word:
         
         curr = (token_t){0};
         scanner_next(&s);
-        if (scanner_eof(&s)) {
-            curr.type = TOK_AMP;
-            curr.str_idx = word_start;
-            push_token(&r, &curr);
-            goto init;
-        } else if (s.curr == '&') {
+        if (s.curr == '&') {
             curr.type = TOK_AND_IF;
             curr.str_idx = word_start;
             push_token(&r, &curr);
             scanner_next(&s);
             goto init;
-        } else {error_parse(ERR_UNEXP, s.buf + s.i);*st=1;goto __exit;}
+        } else {
+            curr.type = TOK_AMP;
+            curr.str_idx = word_start;
+            push_token(&r, &curr);
+            goto init;
+        } // else {error_parse(ERR_UNEXP, s.buf + s.i);*st=1;goto __exit;}
+        
         
     case '|':
         if (dquoted) {

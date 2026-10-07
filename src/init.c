@@ -91,6 +91,16 @@ static int init_shell_env(const char *argv0) {
     }
 
     OKAY("changed $SHELL to: %s", getenv("SHELL"));
+    // Increase shlvl (shell level)
+    char* shlvl = getenv("SHLVL");
+    if (!shlvl || strlen(shlvl) == 0) {
+        return 0;
+    }
+    int shllvl_int = atoi(shlvl);
+    char buff[128];
+    sprintf(buff, "%d", shllvl_int + 1);
+    setenv("SHLVL", buff, 1);
+    setenv("null", "/dev/null", 1);
     return 0;
 }
 

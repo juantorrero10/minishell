@@ -17,6 +17,8 @@
 #define EXIT_ERROR_UNEXPECTED_AST (int)-6
 #define EXIT_ERROR_DUPING_FD (int)-7
 #define EXIT_ERROR_CLOSING_FD (int)-8
+#define EXIT_ERROR_HERESTR (int)-9
+#define EXIT_ERROR_UNIMPLEMENTED (int)-10
 
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 

@@ -122,11 +122,17 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
                     error_parse(ERR_INVALID_REDIR_SYNTAX, ptr + strloc(arr, idx-1));
                     goto __redir_abort;
                 }
+            if (!is_last_token(arr, idx+1)) {
+                error_parse(ERR_UNEXP, (char*)cmdline + strloc(arr, idx+2));
+                goto __redir_abort;
+            }
             rd_idx = idx;
             if (tok_type(arr, idx) == TOK_REDIR_HEREDOC)
                 curr_rd->target_kind = REDIR_TARGET_HEREDOC;
             else curr_rd->target_kind = REDIR_TARGET_HERESTR;
             get_word(arr, idx+1, &curr_rd->target.filename);
+
+            
             //Skip until end of quotes
             if (tok_type(arr, idx+1) == TOK_DQ_START) {
                 while(tok_type(arr, idx+1) != TOK_DQ_END) {
@@ -207,7 +213,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     idx_redir = find_redirs(arr, cmdline, &nredirs);
     CHECK_ABORT(ret);
     if (nredirs) {
-        view = make_arr_view(arr, idx_redir, __INT32_MAX__);
+        view = make_arr_view(arr, idx_redir, __SIZE_MAX__);
         cmd.redirs = parse_redirections(&view, cmdline, &nredirs);
         CHECK_ABORT(ret);
         cmd.nredirs = nredirs;
@@ -352,7 +358,7 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
             error_parse(ERR_UNEXP, ptr + strloc(arr, idx+1));
             goto __group_abort;
         }
-        view = make_arr_view(arr, idx, __INT32_MAX__);
+        view = make_arr_view(arr, idx, __SIZE_MAX__);
         grp.redirs = parse_redirections(&view, cmdline, &n_red);
         grp.nredirs = n_red;
     }
@@ -403,7 +409,15 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
     sep.sep_type = (separator_kind)tok_type(arr, idx);
     view_left = make_arr_view(arr, 0, idx - 1);
     view_right = make_arr_view(arr, idx+1, arr->count - 1);
-    sep.left = parse_generic(&view_left, cmdline, NULL);
+    ast_t* lhs = parse_generic(&view_left, cmdline, NULL);
+    if (sep.sep_type == SEP_AMP) {
+        sep.sep_type = SEP_AND;
+        sep.left = ast_create_empty();
+        sep.left->type = AST_BG;
+        sep.left->node.bg.children = lhs;
+    } else {
+        sep.left = lhs;
+    }
     sep.right = parse_generic(&view_right, cmdline, NULL);
     if (g_abort_ast) {
         ast_free(sep.left);

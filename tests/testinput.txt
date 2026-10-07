@@ -1,8 +1,8 @@
 find / -type f 2> /dev/null \
 | xargs du -b 2> /dev/null \
 | sort -nr \
-| head -n 2 -a 2 \
-> out.txt
+| head -n 2 \
+> out.txt &
 
 
 # 1. Build a big list of files in HOME

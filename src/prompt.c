@@ -32,6 +32,7 @@ void prompt_print_cwd(bool abrv_home) {
     if (abrv_home)
     {
         strcpy(home, getenv("HOME"));
+        sz_home = strlen(home);
 
         // Si la subcadena /home/{user} esta al principio de la ruta ->
         if (strncmp(pwd, home, sz_home) == 0) {
