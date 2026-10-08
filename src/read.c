@@ -77,9 +77,9 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
         
         // Actualizar el último codigo de error. $STATUS
         g_last_error_code = ret;
-        setenv("PREV", buff, 1);
+        setenv("last", buff, 1);
         sprintf(buff, "%d", ret);
-        setenv("STATUS", buff, 1);
+        setenv("status", buff, 1);
         
 
         ast_free(a);

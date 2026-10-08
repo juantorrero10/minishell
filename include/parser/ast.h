@@ -72,12 +72,16 @@ typedef struct {
 } ast_node_pipeline_t;
 
 // They can either be a group or a subshell
-typedef enum {GROUP_SUBSHELL, GROUP_GENERIC} group_king;
+typedef enum {GROUP_SUBSHELL, GROUP_GENERIC} group_kind;
+struct redir_arr {
+    ast_node_redir_t* data;
+    size_t sz;
+};
+
 typedef struct {
-    group_king group_type;
+    group_kind group_type;
     ast_t* children;
-    ast_node_redir_t* redirs;       // Array of redirections
-    size_t nredirs;
+    struct redir_arr redirs;
 } ast_node_group_t;
 
 typedef struct {

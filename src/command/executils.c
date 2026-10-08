@@ -1,5 +1,6 @@
 #include <minishell.h>
 #include <parser/public.h>
+#include <log.h>
 
 #include <sys/mman.h>
 
@@ -84,6 +85,7 @@ L1:
             g_abort_execution = 1;
             return EXIT_ERROR_OPENING_FILE;
         }
+        INFO("DUP2 REDIR_OUT: %d %d", new_fd, rd->left_fd);
         dup2(new_fd, rd->left_fd);
         close(new_fd);
         break;
@@ -96,6 +98,7 @@ L1:
             }
             break;
         }
+        INFO("DUP2 REDIR_DUP_OUT: %d %d", rd->target.fd, rd->left_fd);
         if (dup2(rd->target.fd, rd->left_fd) == -1) {
             MSH_ERR("couldn't duplicate fds: %d -> %d: %s", rd->target.fd, rd->left_fd, strerror(errno));
             g_abort_execution = 1;

@@ -9,7 +9,7 @@ static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* loc
 
 /**
  * @brief parse redirections.
- * It only expects a view of only redirections.
+ * It expects a view of only redirections.
  * no words, no separators...
  * @param __nredirs   [out] if NULL or *0 figure out nredirs at return it
  *                  \n[in]  *nredirs != 0 caller may have provided nredirs previouly so no need to do it again.
@@ -164,6 +164,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
 
 __redir_abort:
     g_abort_ast = 1;
+    free(curr_rd->target.filename);
     free(redir_arr);
     return NULL;
 }
@@ -327,8 +328,6 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
     char* ptr = (char*) cmdline;
 
     ret->type = AST_GROUP;
-    grp.nredirs = 0;
-    grp.redirs = NULL;
 
     //Get type of group.
     if (arr->ptr[0].type == TOK_LPAREN) grp.group_type = GROUP_SUBSHELL;
@@ -359,16 +358,24 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
             goto __group_abort;
         }
         view = make_arr_view(arr, idx, __SIZE_MAX__);
-        grp.redirs = parse_redirections(&view, cmdline, &n_red);
-        grp.nredirs = n_red;
+        grp.redirs.data = parse_redirections(&view, cmdline, &n_red);
+        if (g_abort_ast) {
+            goto __group_abort;
+        }
+        grp.redirs.sz = n_red;
     }
     //Parse children
     view = make_arr_view(arr, 1, idx-2);
     grp.children = parse_generic(&view, cmdline, NULL);
+    if (g_abort_ast) {
+        goto __group_abort;
+    }
     ret->node.grp = grp;
 
     return ret;
 __group_abort:
+    // attach it so it gets freed
+    ret->node.grp = grp;
     ast_free(ret);
     g_abort_ast = 1;
     return NULL;
@@ -402,6 +409,7 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
             view_left = make_arr_view(arr, 0, arr->count - temp);
             ast_free(ret);
             return parse_generic(&view_left, cmdline, NULL);
+            if (g_abort_ast) goto __list_abort;
         }
     }
 
@@ -410,6 +418,7 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
     view_left = make_arr_view(arr, 0, idx - 1);
     view_right = make_arr_view(arr, idx+1, arr->count - 1);
     ast_t* lhs = parse_generic(&view_left, cmdline, NULL);
+    if (g_abort_ast) goto __list_abort;
     if (sep.sep_type == SEP_AMP) {
         sep.sep_type = SEP_AND;
         sep.left = ast_create_empty();
@@ -419,16 +428,17 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
         sep.left = lhs;
     }
     sep.right = parse_generic(&view_right, cmdline, NULL);
-    if (g_abort_ast) {
-        ast_free(sep.left);
-        ast_free(sep.right);
-        sep.left = NULL;
-        sep.right = NULL;
-        ast_free(ret);
-        return NULL;
-    }
+    if (g_abort_ast) goto __list_abort;
     ret->node.sep = sep;
     return ret;
+__list_abort:
+    g_abort_ast = 1;
+    ast_free(sep.left);
+    ast_free(sep.right);
+    sep.left = NULL;
+    sep.right = NULL;
+    ast_free(ret);
+    return NULL;
 }
 
 static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
@@ -447,9 +457,16 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     bool after_pipe     = 0;
     bool group_element  = 0; (void) group_element;
     // tokens allowed in a pipeline (using this to delimit the pipeline) + redirs
-    // size: 6
-    token_kind allowed[] = {TOK_WORD, 
-        TOK_PIPE, TOK_DQ_START, TOK_DQ_END, TOK_CMD_ST_START, TOK_CMD_ST_END};
+    // size: 7
+    token_kind allowed[] = {
+        TOK_WORD, 
+        TOK_PIPE, 
+        TOK_DQ_START, 
+        TOK_DQ_END, 
+        TOK_CMD_ST_START, 
+        TOK_CMD_ST_END,
+    };
+    size_t allowed_sz = sizeof(allowed) / sizeof(token_kind);
     int cmd_sub = 0;
 
     ret->type = AST_PIPELINE;
@@ -474,7 +491,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
             }
         }
         if (
-            (!type_in_list(tok_type(arr, idx), allowed, 6)) && cmd_sub <= 0
+            (!type_in_list(tok_type(arr, idx), allowed, allowed_sz)) && cmd_sub <= 0
             && (tc != TC_REDIR && tc != TC_RD_ST))
             { error_parse(ERR_UNEXP, ptr + strloc(arr, idx));
             free(ret); g_abort_ast = 1; return NULL;}
@@ -523,7 +540,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     return ret;
 
 abort_ppl:
-    if (ret) { ast_free(ret); free(ret); }
+    if (ret) { ast_free(ret); }
     g_abort_ast = 1;
     return NULL;
     
@@ -538,8 +555,8 @@ abort_ppl:
  */
 static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* locate_at) {
     // HIGHER LEVEL
-    // 0. background flag
-    // 1. parse_list
+    // 0. parse_list
+    // 1. background flag
     // 3. parse_pipeline
     // 4  parse_group    << redirections
     // 5. parse_command  << redirections
@@ -556,20 +573,23 @@ static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* loc
 
     if (arr->count == 0) return NULL;
 
-    // Background flag
-    if (arr->ptr[arr->count-2].type == TOK_AMP) {
-        ret = ast_create_empty();
-        ret->type = AST_BG;
-        view = make_arr_view(arr, 0, arr->count-3);
-        bg.children = parse_generic(&view, cmdline, locate_at);
-        ret->node.bg = bg; return ret;
-    }
+    
 
     /*-------------------- LISTS -------------------*/
     found = find_list_sep(arr, cmdline, 0);
     if (g_abort_ast) return NULL;
     if (found >= 0) {
         return parse_list(arr, found, cmdline);
+    }
+
+    // Background flag
+    int last_idx = arr->count - ((arr->ptr[arr->count-1].type == TOK_EOL)? 2 : 1);
+    if (tok_type(arr, last_idx) == TOK_AMP) {
+        ret = ast_create_empty();
+        ret->type = AST_BG;
+        view = make_arr_view(arr, 0, last_idx - 1);
+        bg.children = parse_generic(&view, cmdline, locate_at);
+        ret->node.bg = bg; return ret;
     }
 
     /*-------------------- PIPELINES -------------------*/

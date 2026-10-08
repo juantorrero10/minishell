@@ -245,16 +245,22 @@ int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
         tc = categorize_token(arr->ptr[idx].type);
         if (tc == TC_GROUP_START)group_weight++;
         if (tc == TC_GROUP_END)group_weight--;
-        if (!group_weight && tc == TC_SEP 
+        if (group_weight != 0 || tc != TC_SEP) goto __keep_searching;
+        // & token at the end of the array doesnt count as list separator
+        if (is_last_token(arr, idx) && tok_type(arr, idx) == TOK_AMP) goto __keep_searching;
+        if (tc == TC_SEP
             && (!__only_semicolon || arr->ptr[idx].type == TOK_SEMI)) 
             {found=1;break;}
+        __keep_searching:
         idx++;
     }
 
     if (!found) return -1;
 
     // grammar rule: no {&&, ||} at the begining or end of element
-    if (arr->ptr[idx].type != TOK_SEMI) {
+    // is garanteed to be a separator
+    separator_kind sep = (separator_kind)arr->ptr[idx].type;
+    if (sep != SEP_SEMICOLON && sep != SEP_AMP) {
         if (idx == 0 || idx >= (int)arr->count-2) {
             error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
             g_abort_ast = 1;

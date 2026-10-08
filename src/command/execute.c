@@ -12,10 +12,10 @@ struct fds {
     int pipe_read;
 };
 
-
 static error_t execute_ast(
     const ast_t* tree,
     struct fds* fds,
+    struct redir_arr* grp_redirs,
     job_t* inherited_job,
     bool background
 );
@@ -23,13 +23,22 @@ static error_t execute_ast(
 static error_t execute_command(
     const ast_node_command_t* cmd,
     struct fds* fds,
-    job_t* inherited_job
+    struct redir_arr* grp_redirs,
+    job_t* inherited_job,
+    _out_ bool* needs_to_be_waited_for
 );
 
 static error_t execute_pipeline(
     const ast_node_pipeline_t* ppl,
     struct fds* fds,
+    struct redir_arr* grp_redirs,
     job_t* inherited_job
+);
+
+static error_t combine_grp_redirs(
+    const struct redir_arr* r1,
+    const struct redir_arr* r2,
+    _out_ struct redir_arr* out
 );
 
 
@@ -45,21 +54,23 @@ cmd_exit_t execute_line(ast_t* tree, const char* cmdline) {
     }
 
     struct fds fds = {0, 1, 2, -1};
+    struct redir_arr g = {0};
 
-    return execute_ast(tree, &fds, NULL, false);
+    return execute_ast(tree, &fds, &g, NULL, false);
 }
 
 // Main recursive step
 static error_t execute_ast(
     const ast_t* tree,
     struct fds* fds,
+    struct redir_arr* grp_redirs,
     job_t* inherited_job,
     bool background
 ) {
     switch (tree->type) {
         case AST_BG:
             INFO("exec_BG");
-            return execute_ast(tree->node.bg.children, fds, inherited_job, true);
+            return execute_ast(tree->node.bg.children, fds, grp_redirs, inherited_job, true);
         case AST_COMMAND:
         {
             INFO("exec_COMMMAND");
@@ -77,15 +88,15 @@ static error_t execute_ast(
             };
             // Use inherited job or create a new one
             job_t* used_job = (inherited_job != NULL)? inherited_job : &new_job;
-        
-            error_t e = execute_command(&(tree->node.cmd), fds, used_job);
+            bool wait;
+            error_t e = execute_command(&(tree->node.cmd), fds, grp_redirs, used_job, &wait);
             if (e < 0) {
                 return e;
             }
             g_dont_nl = 1;
-            cmd_exit_t exit_code = 0;
+            cmd_exit_t exit_code = e;
             // Only wait for the job if we are not inheriting
-            if (used_job == &new_job) {
+            if (used_job == &new_job && wait) {
                 exit_code = job_wait(used_job);
             }
             g_dont_nl = 0;
@@ -106,11 +117,12 @@ static error_t execute_ast(
                 .pids.count = 0,
                 .state = RUNNING,
             };
-            return execute_pipeline(&(tree->node.ppl), fds, &job);
+            return execute_pipeline(&(tree->node.ppl), fds, grp_redirs, &job);
         }
         case AST_LIST:
         {
-            error_t lhs_ret = execute_ast(tree->node.sep.left, fds, inherited_job, background);
+            INFO("exec_LIST");
+            error_t lhs_ret = execute_ast(tree->node.sep.left, fds, grp_redirs, inherited_job, background);
             
             separator_kind s = tree->node.sep.sep_type;
             if (
@@ -120,7 +132,62 @@ static error_t execute_ast(
             )  {
                 return lhs_ret;
             }
-            return execute_ast(tree->node.sep.right, fds, inherited_job, background);
+            return execute_ast(tree->node.sep.right, fds, grp_redirs, inherited_job, background);
+        }
+        case AST_GROUP:
+        {
+            INFO("exec_GROUP");
+            const ast_node_group_t* grp = &tree->node.grp;
+            if (grp->group_type == GROUP_SUBSHELL) {
+                pid_t pid = fork();
+                if (pid < 0) {
+                    MSH_ERR("Couldn't fork process: %s%s%s%s", 
+                        STYLE_BOLD, COLOR_BRIGHT_RED, strerror(errno), COLOR_RESET);
+                    return EXIT_ERROR_FORKING;
+                }
+                if (pid == 0) {
+                    // increase SHLVL
+                    char* shlvl = getenv("SHLVL");
+                    if (!shlvl || strlen(shlvl) == 0) {
+                        exit(EXIT_ERROR_INTERNAL);
+                    }
+                    int shllvl_int = atoi(shlvl);
+                    char buff[128];
+                    sprintf(buff, "%d", shllvl_int + 1);
+                    setenv("SHLVL", buff, 1);
+                } else {
+                    int status;
+                    tcsetpgrp(STDIN_FILENO, pid);
+                    if (waitpid(pid, &status, 0) < 0) {
+                        MSH_ERR("Error whilst executing subshell: %s%s%s%s", 
+                            STYLE_BOLD, COLOR_BRIGHT_RED, strerror(errno), COLOR_RESET);
+                        return EXIT_ERROR_SUBSHELL;
+                    }
+                    tcsetpgrp(STDIN_FILENO, getpid());
+                    if (WIFEXITED(status)) {
+                        return WEXITSTATUS(status);
+                    } else if (WIFSIGNALED(status)) {
+                        return 128 + WTERMSIG(status);
+                    }
+                    return WEXITSTATUS(status);
+                }
+            }
+            // Insert group redirections
+            struct redir_arr new;
+            error_t err = combine_grp_redirs(
+                &grp->redirs,
+                grp_redirs,
+                &new
+            );
+            if (err < 0) {
+                return err;
+            }
+            cmd_exit_t ret = execute_ast(tree->node.grp.children, fds, &new, inherited_job, background);
+            free(new.data);
+            if (grp->group_type == GROUP_SUBSHELL) {
+                exit(ret);
+            }
+            return ret;
         }
         default:
             MSH_ERR("operation not yet supported");
@@ -133,9 +200,13 @@ static error_t execute_ast(
 static error_t execute_command(
     const ast_node_command_t* cmd,
     struct fds* fds,
-    job_t* job
+    struct redir_arr* grp_redirs,
+    job_t* job,
+    _out_ bool* needs_to_be_waited_for
 ) {
     pid_t pid = 0;
+
+    if (needs_to_be_waited_for) *needs_to_be_waited_for = true;
 
     struct file_streams fss = {
         .in = stdin, 
@@ -198,10 +269,20 @@ static error_t execute_command(
             if (must_fork) {
                 exit(exit_code);
             } else {
+                if (needs_to_be_waited_for) *needs_to_be_waited_for = false;
                 return exit_code;
             }
         }
         INFO("isatty(stdout): %d", isatty(STDOUT_FILENO));
+
+        // Group redirections
+        if (grp_redirs->data && grp_redirs->sz > 0) {
+            for (size_t i = 0; i < grp_redirs->sz; i++)
+            {
+                int code = eu_handle_redirection(&grp_redirs->data[i]);
+                if (code < 0) exit(code);
+            }
+        }
 
         // Pipe redirections
         #define apply_and_close(src_fd, target_fd) do {\
@@ -252,6 +333,7 @@ static error_t execute_command(
 static error_t execute_pipeline(
     const ast_node_pipeline_t* ppl,
     struct fds* fds,
+    struct redir_arr* grp_redirs,
     job_t* pipeline_job
 ) {
     struct fds new_fds = *fds;
@@ -271,7 +353,13 @@ static error_t execute_pipeline(
 
         // Recurrsive call
         error_t err;
-        if ((err = execute_ast(&ppl->elements[i], &new_fds, pipeline_job, pipeline_job->background)) < 0) {
+        if ((err = execute_ast(
+            &ppl->elements[i], 
+            &new_fds, 
+            grp_redirs, 
+            pipeline_job, 
+            pipeline_job->background)
+        ) < 0) {
             return err;
         }
         
@@ -282,4 +370,46 @@ static error_t execute_pipeline(
     }
     return job_wait(pipeline_job);
     
+}
+
+static error_t combine_grp_redirs(
+    const struct redir_arr* r1,
+    const struct redir_arr* r2,
+    _out_ struct redir_arr* out
+) {
+    error_t err = 0;
+    out->data = NULL;
+    out->sz = 0;
+    if (!r1->sz && !r2->sz) {
+        return 0;
+    }
+    ast_node_redir_t* new = calloc(r1->sz + r2->sz, sizeof(ast_node_redir_t));
+    if (r1->sz && r1->data) {
+        memcpy(new, r1->data, r1->sz * sizeof(ast_node_redir_t));
+        for (size_t i = 0; i < r1->sz; i++) {
+            ast_node_redir_t* r = &new[i];
+            if (r->op == REDIR_OUT) {
+                // Truncate the file here so that it only gets truncated once.
+                // Otherwise it will get the truncated for every command inside a group.
+                int ret = truncate(r->target.filename, 0);
+                // We don't care if the file does not exist.
+                if (ret != 0 && errno != ENOENT) {
+                    err = EXIT_ERROR_OPENING_FILE;
+                    MSH_ERR("couldn't truncate file '%s': %s", r->target.filename, strerror(errno));
+                    goto __error_exit;
+                }
+                r->op = REDIR_OUT_APPEND;
+            }
+        }
+    }
+    if (r2->sz && r2->data) {
+        memcpy(&new[r1->sz], r2->data, r2->sz * sizeof(ast_node_redir_t));
+    }
+    out->data = new;
+    out->sz = r1->sz + r2->sz;
+    return 0;
+
+__error_exit:
+    free(new);
+    return err;
 }

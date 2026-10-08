@@ -88,14 +88,13 @@ static void ast_free_contents(ast_t* t) {
             ast_free(t->node.grp.children);
             /* don't free t->node.grp.children pointer here — caller will if it's a heap ptr */
         }
-        if (t->node.grp.redirs) {
+        if (t->node.grp.redirs.data) {
             // free array of redirs if capacity (adjust per your definitions)
-            for (size_t i = 0; i < t->node.grp.nredirs; i++)
-                ast_free_redir(t->node.grp.redirs[i]);
+            for (size_t i = 0; i < t->node.grp.redirs.sz; i++)
+                ast_free_redir(t->node.grp.redirs.data[i]);
             
-            free(t->node.grp.redirs);
-            t->node.grp.redirs = NULL;
-            t->node.grp.nredirs = 0;
+            free(t->node.grp.redirs.data);
+            t->node.grp.redirs = (struct redir_arr){0};
         }
         break;
     case AST_SUBST:

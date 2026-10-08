@@ -19,6 +19,8 @@
 #define EXIT_ERROR_CLOSING_FD (int)-8
 #define EXIT_ERROR_HERESTR (int)-9
 #define EXIT_ERROR_UNIMPLEMENTED (int)-10
+#define EXIT_ERROR_INTERNAL (int)-11
+#define EXIT_ERROR_SUBSHELL (int)-12
 
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 

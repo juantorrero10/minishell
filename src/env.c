@@ -128,7 +128,7 @@ void env_expand_ast(ast_t* ast) {
             break;
         case AST_GROUP:
             env_expand_ast(ast->node.grp.children);
-            expand_redirs(ast->node.grp.redirs, ast->node.grp.nredirs);
+            expand_redirs(ast->node.grp.redirs.data, ast->node.grp.redirs.sz);
             break;
         case AST_LIST:
             env_expand_ast(ast->node.sep.left);
@@ -141,9 +141,6 @@ void env_expand_ast(ast_t* ast) {
             {
                 env_expand_ast(&elems[i]);
             }
-            break;
-        case AST_REDIR:
-            expand_redirs(ast->node.grp.redirs, ast->node.grp.nredirs);
             break;
         case AST_SUBSHELL:
         case AST_SUBST:
