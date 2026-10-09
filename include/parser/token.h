@@ -1,6 +1,10 @@
 #ifndef PARSER_TOKEN_H_
 #define PARSER_TOKEN_H_
 
+#define is_last_token(arr, idx) (idx >= (int)arr->count - 1 || arr->ptr[idx+1].type == TOK_EOL)
+#define tok_type(arr, idx) (arr->ptr[idx].type)
+#define strloc(arr, idx) (arr->ptr[idx].str_idx)
+
 #define TT_SEP_IDX 10    //Separator  ||, &&, ...
 #define TT_GR_IDX 20     //Groupers   ), (, }, ...
 #define TT_RD_IDX 30    //Redirections

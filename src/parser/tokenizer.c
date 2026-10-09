@@ -41,9 +41,7 @@ static int chrcount(char *s, char c, int __restrict_view) {
  * */
 static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     token_t ret = { .type = TOK_WORD, .number = 0, .value = NULL };
-    bool squote_last;
     size_t len = we - ws + 1;
-    size_t sz;
     size_t cws = ws;
     char* temp = cmdline + ws; (void)temp;
 
@@ -53,22 +51,22 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
 
    
 
-    // Trim front spaces
+    // Trim front spaces and tabs
     for (size_t i = 0; i < len; i++)
     {
         if (cmdline[cws + i] == ' ') ws++;
+        if (cmdline[cws + i] == '\t') ws++;
         else break;
     }
 
     // trim single quotes
-    if (cmdline[ws] == '\'') {
-        ws++;
-        squote_last = 1;
-    }
+    // if (cmdline[ws] == '\'') {
+    //     ws++;
+    //     squote_last = 1;
+    // }
     
     ret.value = strndup(cmdline + ws, we - ws);
-    sz = strlen(ret.value);
-    if (ret.value[sz-1] == '\'' && squote_last) {ret.value[sz-- - 1] = 0;}
+    // if (ret.value[sz-1] == '\'' && squote_last) {ret.value[sz-- - 1] = 0;}
     ret.str_idx = ws;
     return ret;
 }
@@ -141,7 +139,7 @@ static size_t isnum(const char* s) {
     return sz2;
 }
 
-static void stack_push(char* pile, int* pile_top, char c) {
+static inline void stack_push(char* pile, int* pile_top, char c) {
     int pt = 0;
 
     pt = *pile_top;
@@ -149,7 +147,7 @@ static void stack_push(char* pile, int* pile_top, char c) {
     *pile_top = ++pt;
 }
 
-static char stack_pop(char* pile, int* pile_top) {
+static inline char stack_pop(char* pile, int* pile_top) {
     int pt = 0;
 
     pt = *pile_top;
@@ -358,7 +356,7 @@ word:
         push_token(&r, &curr);
         scanner_next(&s);
         goto init;
-
+        
     case ' ':
         if (after_redir) {
             while(s.curr == ' ') scanner_next(&s);

@@ -4,11 +4,7 @@
 
 
 #ifdef COMPILING_PARSER
-extern int g_abort_ast;
-
-#define is_last_token(arr, idx) (idx >= (int)arr->count - 1 || arr->ptr[idx+1].type == TOK_EOL)
-#define tok_type(arr, idx) (arr->ptr[idx].type)
-#define strloc(arr, idx) (arr->ptr[idx].str_idx)
+    extern int g_abort_ast;
 #endif
 
 // Main parser function

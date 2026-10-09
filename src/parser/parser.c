@@ -306,8 +306,6 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
         break;
     }
 
-    //STEP 3: self explanatory
-    cmd.filename = find_binary_path(cmd.argv[0]);
     ret->node.cmd = cmd;
     return ret;
 }

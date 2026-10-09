@@ -68,10 +68,6 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     ast_t* a = parse_string(buff);
     if (a != NULL) {
 
-        // expandir variables de entorno y juntar argumentos entre comillas
-        env_expand_ast(a);
-        // join_quoted_arguments(expanded);
-
         // ejecutar commando.
         ret = execute_line(a, buff);
         

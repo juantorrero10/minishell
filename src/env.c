@@ -22,11 +22,13 @@ static size_t expansion_pass(const char* og, char* new, bool fill_buff) {
     size_t var_end = 0;
     size_t new_idx = 0;
     bool in_brackets;
+    bool dollar_encountered = false;
 
     // First pass: determine the allocation size
     while (og[idx]) {
         in_brackets = false;
         if (og[idx] == '$') {
+            dollar_encountered = true;
             idx++;
             if (og[idx] == '{') {
                 in_brackets = true;
@@ -57,38 +59,73 @@ static size_t expansion_pass(const char* og, char* new, bool fill_buff) {
     if (fill_buff) {
         new[new_idx] = '\0';
     }
+    if (!dollar_encountered) {
+        return 0;
+    }
     return ++new_idx;
 }  
 
 /**
- * @brief Expande las variables de entorno en una cadena.
- * @param og cadena original.
- * @return cadena con las variables expandidas.
- * @note se debe liberar el puntero tras su uso.
+ * @brief Expands string into a newly allocated buffer or inside the provided one.
+ * @param og Original string.
+ * @param buff [Optional] if !NULL the new string (expanded or not) will be appended
+ * inside the buffer
+ * @return 
+ *  Expanded string or NULL if no expansion was needed. 
+ *  If a buffer was provided, it will return buff->data.
+ * @note New string needs to be freed if no buffer provided.
  */
-char* env_expand_string(const char* og) {
-    char* ret = NULL;
+char* env_expand_string(
+    const char* og, 
+    _opt_ struct env_growable_string* buff
+) {
+    if (!og || !(og[0])) {
+        return NULL;
+    }
     
     // First pass: figure out allocation size
     size_t new_sz = expansion_pass(og, NULL, false);
 
-    if (new_sz == strlen(og)) {
+    if (!buff && new_sz == 0) {
         return NULL;
     }
 
-    ret = malloc(sizeof(char) * new_sz);
-    expansion_pass(og, ret, true);
 
-    return ret;
+    if (buff) {
+        bool just_concat = false;
+        if (new_sz == 0) {
+            just_concat = true;
+            new_sz = strlen(og);
+        }
+        size_t new_len = new_sz + buff->len;
+        if (new_len >= buff->cap) {
+            buff->cap *= 2;
+            buff->data = realloc(buff->data, buff->cap);
+        }
+        if (!just_concat) {
+            expansion_pass(og, buff->data + buff->len, true);
+            buff->len = new_len - 1;
+        } else {
+            memcpy(buff->data + buff->len, og, new_sz);
+            buff->len += new_sz;
+        }
+        return buff->data;
+    }
+    char* new = malloc(new_sz);
+    expansion_pass(og, new, true);
+    return new;
 }
 
-static void expand_redirs(ast_node_redir_t* redirs, size_t nredirs) {
+/**
+ * @brief Expand the enviroment vars in the strings of the redirections
+ */
+void env_expand_redirs(ast_node_redir_t* redirs, size_t nredirs) {
     if (!redirs || nredirs == 0) return;
     for (size_t i = 0; i < nredirs; i++)
     {
         redir_target t = redirs[i].target_kind;
         if (t == REDIR_TARGET_FILE || t == REDIR_TARGET_HERESTR) {
-            char* new_string = env_expand_string(redirs[i].target.filename);
+            char* new_string = env_expand_string(redirs[i].target.filename, NULL);
             if (new_string == NULL || new_string == 0) {
                 continue;
             }
@@ -100,6 +137,7 @@ static void expand_redirs(ast_node_redir_t* redirs, size_t nredirs) {
 }
 
 /**
+ * @deprecated Env vars are expanded individually the moment they are needed.
  * @brief Recursive expansion of enviroment variables of all found strings of an AST.
  * @param ast AST to be expanded.
  */
@@ -113,22 +151,22 @@ void env_expand_ast(ast_t* ast) {
         case AST_COMMAND:
             for (int i = 0; i < ast->node.cmd.argc; i++)
             {
-                new_string = env_expand_string(ast->node.cmd.argv[i]);
-                if (new_string == NULL || new_string == 0) {
+                new_string = env_expand_string(ast->node.cmd.argv[i], NULL);
+                if (new_string == NULL) {
                     continue;
                 }
                 // Replace string
                 free(ast->node.cmd.argv[i]);
                 ast->node.cmd.argv[i] = new_string;
             }
-            expand_redirs(ast->node.cmd.redirs, ast->node.cmd.nredirs);
+            env_expand_redirs(ast->node.cmd.redirs, ast->node.cmd.nredirs);
             break;
         case AST_BG:
             env_expand_ast(ast->node.bg.children);
             break;
         case AST_GROUP:
             env_expand_ast(ast->node.grp.children);
-            expand_redirs(ast->node.grp.redirs.data, ast->node.grp.redirs.sz);
+            env_expand_redirs(ast->node.grp.redirs.data, ast->node.grp.redirs.sz);
             break;
         case AST_LIST:
             env_expand_ast(ast->node.sep.left);

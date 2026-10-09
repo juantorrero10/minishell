@@ -39,9 +39,9 @@ typedef enum {
 
 
 typedef enum {
-    REDIR_TARGET_FILE,     // > file, < file
+    REDIR_TARGET_FILE,     // > file, < file, <> file
     REDIR_TARGET_FD,       // >&1, <&3
-    REDIR_TARGET_HEREDOC,  // <<EOF
+    REDIR_TARGET_HEREDOC,  // << EOF
     REDIR_TARGET_HERESTR,  // <<< "string"
     REDIR_TARGET_CLOSE     // "-"
 } redir_target;
@@ -61,7 +61,6 @@ typedef struct {
 typedef struct {
     char **argv;                    //NULL terminated
     int argc;
-    char* filename;                 //NULL if internal or non-existent
     ast_node_redir_t* redirs;       // Array of redirections
     size_t nredirs;                 // N of redirs
 } ast_node_command_t;
@@ -114,6 +113,7 @@ struct _ast_generic_type {
 };
 
 void ast_free(ast_t* a);
+void ast_free_redir(ast_node_redir_t* rd);
 
 #ifdef COMPILING_PARSER
     ast_t* ast_create_empty();

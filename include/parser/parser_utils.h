@@ -4,7 +4,7 @@
 
 // Unordered sort of helper functions.
 
-char* str_tok(token_kind tt, char buff[]);
+char* token_to_string(token_kind tt, char buff[]);
 void pu_peek(token_arr* arr);
 int pu_check_balance(char* cmdline, size_t view);
 token_category categorize_token(token_kind tt);

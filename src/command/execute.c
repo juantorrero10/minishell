@@ -13,15 +13,19 @@ struct fds {
 };
 
 static error_t execute_ast(
-    const ast_t* tree,
+    ast_t* tree,
     struct fds* fds,
     struct redir_arr* grp_redirs,
     job_t* inherited_job,
     bool background
 );
 
+static error_t execute_redirection(
+    ast_node_redir_t* rd
+);
+
 static error_t execute_command(
-    const ast_node_command_t* cmd,
+    ast_node_command_t* cmd,
     struct fds* fds,
     struct redir_arr* grp_redirs,
     job_t* inherited_job,
@@ -36,8 +40,8 @@ static error_t execute_pipeline(
 );
 
 static error_t combine_grp_redirs(
-    const struct redir_arr* r1,
-    const struct redir_arr* r2,
+    struct redir_arr* r1,
+    struct redir_arr* r2,
     _out_ struct redir_arr* out
 );
 
@@ -61,7 +65,7 @@ cmd_exit_t execute_line(ast_t* tree, const char* cmdline) {
 
 // Main recursive step
 static error_t execute_ast(
-    const ast_t* tree,
+    ast_t* tree,
     struct fds* fds,
     struct redir_arr* grp_redirs,
     job_t* inherited_job,
@@ -137,7 +141,7 @@ static error_t execute_ast(
         case AST_GROUP:
         {
             INFO("exec_GROUP");
-            const ast_node_group_t* grp = &tree->node.grp;
+            ast_node_group_t* grp = &tree->node.grp;
             if (grp->group_type == GROUP_SUBSHELL) {
                 pid_t pid = fork();
                 if (pid < 0) {
@@ -173,17 +177,21 @@ static error_t execute_ast(
                 }
             }
             // Insert group redirections
-            struct redir_arr new;
-            error_t err = combine_grp_redirs(
-                &grp->redirs,
-                grp_redirs,
-                &new
-            );
-            if (err < 0) {
-                return err;
+            cmd_exit_t ret;
+            {
+                // Alloc
+                struct redir_arr new;
+                error_t err = combine_grp_redirs(
+                    &grp->redirs,
+                    grp_redirs,
+                    &new
+                );
+                if (err < 0) {
+                    return err;
+                }
+                ret = execute_ast(tree->node.grp.children, fds, &new, inherited_job, background);
+                free(new.data);
             }
-            cmd_exit_t ret = execute_ast(tree->node.grp.children, fds, &new, inherited_job, background);
-            free(new.data);
             if (grp->group_type == GROUP_SUBSHELL) {
                 exit(ret);
             }
@@ -195,15 +203,206 @@ static error_t execute_ast(
     }
 }
 
+static int create_buff_fd(const char *content) {
+    int fd = memfd_create("minishell_heredoc", 0);
+    if (fd == -1) return -1;
+
+    if (content && content[0] != '\0') {
+        write(fd, content, strlen(content));
+    }
+
+    lseek(fd, 0, SEEK_SET);
+
+    return fd;
+}
+
+
+static error_t execute_redirection(ast_node_redir_t* rd) {
+    int new_fd = 0;
+
+    //Default mask and mode values
+    int flag_mask = O_CREAT | O_TRUNC | O_WRONLY;
+    int mode_mask = 0644;
+
+    switch (rd->op)
+    {
+    case REDIR_IN:
+        flag_mask = O_RDONLY;
+        goto L1;
+    case REDIR_OUT_APPEND:
+        flag_mask = O_CREAT | O_APPEND | O_WRONLY;
+        goto L1;
+    case REDIR_READ_WRITE:
+        flag_mask = O_CREAT | O_RDWR;
+        goto L1;
+    case REDIR_OUT:
+L1:
+        if (!(flag_mask & O_CREAT)) {
+            mode_mask = umask(0);
+            umask(mode_mask);
+        }
+        if ((new_fd = open(rd->target.filename, flag_mask, mode_mask)) == -1) {
+            MSH_ERR("couldn't open file '%s': %s", rd->target.filename, strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_OPENING_FILE;
+        }
+        INFO("DUP2 REDIR_OUT: %d %d", new_fd, rd->left_fd);
+        dup2(new_fd, rd->left_fd);
+        close(new_fd);
+        break;
+    case REDIR_DUP_IN:
+    case REDIR_DUP_OUT:
+        if (rd->target_kind == REDIR_TARGET_CLOSE) {
+            if (close(rd->left_fd) == -1) {
+                g_abort_execution = 1;
+                return EXIT_ERROR_CLOSING_FD;
+            }
+            break;
+        }
+        INFO("DUP2 REDIR_DUP_OUT: %d %d", rd->target.fd, rd->left_fd);
+        if (dup2(rd->target.fd, rd->left_fd) == -1) {
+            MSH_ERR("couldn't duplicate fds: %d -> %d: %s", rd->target.fd, rd->left_fd, strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_DUPING_FD;
+        } break;
+    //todo: herestr and heredoc
+    case REDIR_HERESTR:
+        new_fd = create_buff_fd(rd->target.string);
+        if (new_fd < 0) {
+            MSH_ERR("couldn't create the herestr: %s", strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_HERESTR;
+        }
+        dup2(new_fd, 0);
+        close(new_fd);
+        break;
+    case REDIR_HEREDOC:
+        char* delim = rd->target.delimiter;
+        size_t delim_sz = strlen(rd->target.delimiter);
+        struct env_growable_string buff = {
+            .data = malloc(sizeof(char) * INPUT_LINE_MAX),
+            .cap = INPUT_LINE_MAX,
+            .len = 0
+        };
+        char line_buff[INPUT_LINE_MAX];
+        bool is_atty = isatty(STDOUT_FILENO);
+        
+        while(1) {
+            if (is_atty) {
+                M_COLOR_GREY(stdout);
+                fprintf(stdout, ">  ");
+                M_COLOR_RESET(stdout);
+            }
+            fgets(line_buff, INPUT_LINE_MAX, stdin);
+
+            size_t sz = strlen(line_buff);
+            if (sz > 0 && line_buff[sz - 1] == '\n') sz--;
+            if (delim_sz == sz && !strncmp(delim, line_buff, sz)) {
+                break;
+            }
+            env_expand_string(line_buff, &buff);
+        }
+        buff.data[buff.len] = '\0';
+        new_fd = create_buff_fd(buff.data);
+        if (new_fd < 0) {
+            MSH_ERR("couldn't create the heredoc: %s", strerror(errno));
+            g_abort_execution = 1;
+            return EXIT_ERROR_HERESTR;
+        }
+        dup2(new_fd, 0);
+        close(new_fd);
+        free(buff.data);
+        break;
+    default:
+        MSH_ERR("unknown redirection type or not supported yet.");
+        g_abort_execution = 1;
+        break;
+    }
+
+    return 0;
+}
+
+
+ /**
+ * @brief locate a binary in the disk through $PATH env var.
+ * resulting string need to be freed.
+ * returns NULL if non-existant.
+ */
+static char* find_binary_path(const char* name) {
+    const char* path_env    = NULL;
+    char* path              = NULL;
+    char* saveptr           = NULL;
+    char* dir               = NULL;
+    char* full              = NULL;
+    size_t needed           = 0;
+    size_t len_dir          = 0;
+    size_t len_name         = 0;
+    
+
+    if (!name || !*name)
+        return NULL;
+
+    // If the name already contains a '/', treat it literally.
+    if (strchr(name, '/')) {
+        if (access(name, X_OK) == 0)
+            return strdup(name);
+        return NULL;
+    }
+
+    path_env = getenv("PATH");
+    if (!path_env)
+        return NULL;
+
+    // Duplicate PATH because strtok modifies it
+    path = strdup(path_env);
+    if (!path)
+        return NULL;
+
+    dir = strtok_r(path, ":", &saveptr);
+
+    while (dir) {
+        len_dir = strlen(dir);
+        len_name = strlen(name);
+
+        // Allocate buffer for: dir + '/' + name + '\0'
+        needed = len_dir + 1 + len_name + 1;
+        full = malloc(needed);
+        if (!full) {
+            free(path);
+            return NULL;
+        }
+
+        // dir/name
+        strcpy(full, dir);
+        full[len_dir] = '/';
+        strcpy(full + len_dir + 1, name);
+
+        // if exec.
+        if (access(full, X_OK) == 0) {
+            free(path);
+            return full;
+        }
+
+        free(full);
+        dir = strtok_r(NULL, ":", &saveptr);
+    }
+
+    free(path);
+    return NULL;
+}
 
 
 static error_t execute_command(
-    const ast_node_command_t* cmd,
+    ast_node_command_t* cmd,
     struct fds* fds,
     struct redir_arr* grp_redirs,
     job_t* job,
     _out_ bool* needs_to_be_waited_for
 ) {
+    if (cmd->argc <= 0) {
+        return 0;
+    }
+
     pid_t pid = 0;
 
     if (needs_to_be_waited_for) *needs_to_be_waited_for = true;
@@ -214,9 +413,29 @@ static error_t execute_command(
         .err = stderr
     };
 
+    
+    // argument expansion
+    for (size_t i = 0; i < (size_t)cmd->argc; i++) {
+        size_t len = strlen(cmd->argv[i]);
+        // If wrapped in single quotes, do not expand
+        // Second check is probably useless since i doubt the parse lets you
+        // have and unterminated single quote
+        // TODO: remove the '
+        if (cmd->argv[i][0] == '\'' && cmd->argv[i][len - 1] == '\'')
+            continue;
+
+        char* new = env_expand_string(cmd->argv[i], NULL);
+        if (new) {
+            free(cmd->argv[i]);
+            cmd->argv[i] = new;
+        }
+    }
+    
+    char* bin_path = find_binary_path(cmd->argv[0]);
+
     // Determine if external command needs to be overriden
     bool override = false;
-    if (cmd->filename != NULL) {
+    if (bin_path != NULL) {
         char** ow_table = g_overwrite_external;
         while (*ow_table) {
             if (!strcmp(*ow_table, cmd->argv[0])) {
@@ -230,7 +449,7 @@ static error_t execute_command(
     // Figure out if its a builtin command
     bool is_builtin = false;
     int builtin_idx = 0;
-    if (cmd->filename == NULL || override) {
+    if (bin_path == NULL || override) {
         builtin_t* table = g_builtin_function_table;
         while (table->fptr != NULL) {
             if (!strcmp(cmd->argv[0], table->name)) {
@@ -249,7 +468,9 @@ static error_t execute_command(
     }
 
     bool must_fork = !is_builtin || job->pipe || job->background;
-
+    
+    // env var expansion for the redirs
+    env_expand_redirs(cmd->redirs, cmd->nredirs);
 
     if (must_fork) {
         pid = fork();
@@ -279,7 +500,7 @@ static error_t execute_command(
         if (grp_redirs->data && grp_redirs->sz > 0) {
             for (size_t i = 0; i < grp_redirs->sz; i++)
             {
-                int code = eu_handle_redirection(&grp_redirs->data[i]);
+                int code = execute_redirection(&grp_redirs->data[i]);
                 if (code < 0) exit(code);
             }
         }
@@ -305,7 +526,7 @@ static error_t execute_command(
         if (cmd->nredirs && cmd->nredirs > 0) {
             for (size_t i = 0; i < cmd->nredirs; i++)
             {
-                int code = eu_handle_redirection(&cmd->redirs[i]);
+                int code = execute_redirection(&cmd->redirs[i]);
                 if (code < 0) exit(code);
             }
         }
@@ -314,9 +535,9 @@ static error_t execute_command(
         signal(SIGTTOU, SIG_DFL);
         signal(SIGTTIN, SIG_DFL);
         signal(SIGTSTP, SIG_DFL);
-        execve(cmd->filename, cmd->argv, environ);
+        execve(bin_path, cmd->argv, environ);
         // Si ha ocurrido un error.
-        perror(cmd->filename);
+        perror(bin_path);
         // Terminar ejecuccion del proceso hijo.
         _exit(127);
     }
@@ -327,6 +548,7 @@ static error_t execute_command(
         job->pgid = pid;
     }
     setpgid(pid, job->pgid);
+    free(bin_path);
     return 0;
 }
 
@@ -373,8 +595,8 @@ static error_t execute_pipeline(
 }
 
 static error_t combine_grp_redirs(
-    const struct redir_arr* r1,
-    const struct redir_arr* r2,
+    struct redir_arr* r1,
+    struct redir_arr* r2,
     _out_ struct redir_arr* out
 ) {
     error_t err = 0;
@@ -383,6 +605,9 @@ static error_t combine_grp_redirs(
     if (!r1->sz && !r2->sz) {
         return 0;
     }
+    if (r1) env_expand_redirs(r1->data, r1->sz);
+    if (r2) env_expand_redirs(r2->data, r2->sz);
+
     ast_node_redir_t* new = calloc(r1->sz + r2->sz, sizeof(ast_node_redir_t));
     if (r1->sz && r1->data) {
         memcpy(new, r1->data, r1->sz * sizeof(ast_node_redir_t));

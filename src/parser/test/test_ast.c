@@ -88,7 +88,7 @@ bg:
     return;
 
 list:
-    sprintf(scratch2, "sep: '%s'\n", str_tok(ast->node.sep.sep_type, scratch3));
+    sprintf(scratch2, "sep: '%s'\n", token_to_string(ast->node.sep.sep_type, scratch3));
     concat_str(scratch2, buff, scratch, indent_lvl, IND_SPACES, buff_sz);
     memset(scratch2, 0, buff_sz);
     memset(scratch3, 0, buff_sz);
@@ -172,7 +172,7 @@ redirs:
             scratch2,
             "fd=%d op='%s' ",
             rd->left_fd,
-            str_tok(rd->op, scratch3)
+            token_to_string(rd->op, scratch3)
         );
         memset(scratch3, 0, buff_sz);
         strcat(buff, scratch2);

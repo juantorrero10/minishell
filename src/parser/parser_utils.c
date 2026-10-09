@@ -2,7 +2,7 @@
 #include <../log.h>
 
 // returns buff for convenience
-char* str_tok(token_kind tt, char buff[])
+char* token_to_string(token_kind tt, char buff[])
 {
     switch (tt) {
         case TOK_WORD:                 strcpy(buff, "WORD"); break;
@@ -55,7 +55,7 @@ void pu_peek(token_arr* arr) {
     for (size_t i = 0; i < arr->count; i++)
     {
         c = arr->ptr + i;
-        str_tok(c->type, buff);
+        token_to_string(c->type, buff);
         DUMP("%zu:\t%s,\t\tnum:%d\t\tval:%s", i, buff, c->number, c->value);
 
     }
@@ -372,74 +372,6 @@ int find_cmd_sub(token_arr* arr) {
     if (!found) {return -1;}
 
     return idx;
-}
-
-/**
- * @brief locate a binary in the disk through $PATH env var.
- * resulting string need to be freed.
- * returns NULL if non-existant.
- */
-char* find_binary_path(const char* name) {
-    const char* path_env    = NULL;
-    char* path              = NULL;
-    char* saveptr           = NULL;
-    char* dir               = NULL;
-    char* full              = NULL;
-    size_t needed           = 0;
-    size_t len_dir          = 0;
-    size_t len_name         = 0;
-    
-
-    if (!name || !*name)
-        return NULL;
-
-    // If the name already contains a '/', treat it literally.
-    if (strchr(name, '/')) {
-        if (access(name, X_OK) == 0)
-            return strdup(name);
-        return NULL;
-    }
-
-    path_env = getenv("PATH");
-    if (!path_env)
-        return NULL;
-
-    // Duplicate PATH because strtok modifies it
-    path = strdup(path_env);
-    if (!path)
-        return NULL;
-
-    dir = strtok_r(path, ":", &saveptr);
-
-    while (dir) {
-        len_dir = strlen(dir);
-        len_name = strlen(name);
-
-        // Allocate buffer for: dir + '/' + name + '\0'
-        needed = len_dir + 1 + len_name + 1;
-        full = malloc(needed);
-        if (!full) {
-            free(path);
-            return NULL;
-        }
-
-        // dir/name
-        strcpy(full, dir);
-        full[len_dir] = '/';
-        strcpy(full + len_dir + 1, name);
-
-        // if exec.
-        if (access(full, X_OK) == 0) {
-            free(path);
-            return full;
-        }
-
-        free(full);
-        dir = strtok_r(NULL, ":", &saveptr);
-    }
-
-    free(path);
-    return NULL;
 }
 
 bool type_in_list(token_kind t, token_kind* l, size_t sz) {

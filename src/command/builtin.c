@@ -139,7 +139,7 @@ int builtin_set(int c, char** v, struct file_streams fss) {
     case 2:
         name = v[1];
         if (name[0] == '$') name++;
-        return unsetenv(name);
+        return setenv(name, "", 1);
     default:
         MSH_LOG_C("set: Usage %s <var_name> <value>", v[0]);
         return 0;
@@ -150,7 +150,11 @@ int builtin_unset(int c, char** v, struct file_streams fss) {
     if (c > 2) {
         MSH_ERR_C("set: too many arguments");
         return 1;
-    } else if (c == 2) return builtin_set(c, v, fss);
+    } else if (c == 2) {
+        char* name = v[1];
+        if (name[0] == '$') name++;
+        return unsetenv(name);
+    }
     else MSH_LOG_C("unset: Usage %s <var_name>", v[0]);
     return 0;
 }

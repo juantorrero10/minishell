@@ -20,9 +20,10 @@ ast_t* ast_create_array(size_t n_trees) {
 
 static void ast_free_contents(ast_t* t);
 
-static void ast_free_redir(ast_node_redir_t rd) {
-    if (rd.target_kind != REDIR_TARGET_FD && rd.target_kind != REDIR_TARGET_CLOSE) {
-        if (rd.target.filename) free(rd.target.filename);
+void ast_free_redir(ast_node_redir_t* rd) {
+    if (rd->target_kind != REDIR_TARGET_FD && rd->target_kind != REDIR_TARGET_CLOSE) {
+        free(rd->target.filename);
+        rd->target.filename = NULL;
     }
 }
 
@@ -39,13 +40,9 @@ static void ast_free_command(ast_node_command_t* c) {
         c->argv = NULL;
     }
     c->argc = 0;
-    if (c->filename) {
-        free(c->filename);
-        c->filename = NULL;
-    }
     if (c->nredirs && c->redirs) {
         for (size_t i = 0; i < c->nredirs; ++i) {
-            ast_free_redir(c->redirs[i]);
+            ast_free_redir(&c->redirs[i]);
         }
         free(c->redirs);
         c->redirs = NULL;
@@ -80,7 +77,7 @@ static void ast_free_contents(ast_t* t) {
         ast_free_pipeline(&(t->node.ppl));
         break;
     case AST_REDIR:
-        ast_free_redir(t->node.redir);
+        ast_free_redir(&t->node.redir);
         break;
     case AST_GROUP:
     case AST_SUBSHELL:
@@ -91,7 +88,7 @@ static void ast_free_contents(ast_t* t) {
         if (t->node.grp.redirs.data) {
             // free array of redirs if capacity (adjust per your definitions)
             for (size_t i = 0; i < t->node.grp.redirs.sz; i++)
-                ast_free_redir(t->node.grp.redirs.data[i]);
+                ast_free_redir(&t->node.grp.redirs.data[i]);
             
             free(t->node.grp.redirs.data);
             t->node.grp.redirs = (struct redir_arr){0};

@@ -2,6 +2,7 @@
 #define MINISHELL_H_
 
 #define _out_
+#define _opt_
 
 //Necesario para sigaction y otras definiciones que dependen de la defincion de este macro.
 #define _XOPEN_SOURCE 700
@@ -21,6 +22,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <sys/mman.h>
 
 #include <parser/public.h>
 
@@ -33,7 +35,6 @@
 #include <command/execute.h>
 #include <command/builtin.h>
 #include <command/job.h>
-#include <command/executils.h>
 
 
 #endif // MINISHELL_H_
