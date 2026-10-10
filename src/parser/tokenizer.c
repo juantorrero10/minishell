@@ -9,15 +9,16 @@ static void push_token(token_arr* a, token_t* tok) {
     token_t t = *tok;
 
     if (!a->capacity && !a->ptr) {
-        a->ptr = malloc(sizeof(token_t)*INITIAL_ALLOC_SIZE);
+        a->ptr = balloc(sizeof(token_t)*INITIAL_ALLOC_SIZE);
         *a->ptr = t;
         a->capacity = INITIAL_ALLOC_SIZE; a->count = 1;
         if (t.value)a->ptr[0].value = t.value;
         return;
     } 
     if ( a->capacity < a->count+1) {
+        size_t s = a->capacity * sizeof(token_t);
+        a->ptr = brealloc(a->ptr, s, s << 1);
         a->capacity <<= 1;
-        a->ptr = realloc(a->ptr, a->capacity * sizeof(token_t));
     }
     
     a->ptr[a->count] = t;
@@ -69,7 +70,7 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     // + 1 -> Null termination
     // + 1 -> Encode into a byte after the null termination
     // whether if this string needs to be expanded 
-    ret.value = malloc(we - ws + 1 + 1);
+    ret.value = balloc(we - ws + 1 + 1);
     memcpy(ret.value, cmdline + ws, we - ws);
     sz = we - ws;
     ret.value[sz] = '\0';
@@ -106,7 +107,8 @@ static token_kind scan_redir_type(const char* s, _out_ int* skip_chars) {
     size_t sz;
 
     //trim space and numbers.
-    ptr = strndup(s, __restrict_view);
+    ptr = bstrndup(s, __restrict_view);
+
     *skip_chars = 0;
     sz = strlen(ptr);
     for (int i = ((int)sz)-1; i >= 0; i--)
@@ -132,7 +134,6 @@ static token_kind scan_redir_type(const char* s, _out_ int* skip_chars) {
         t = TOK_REDIR_DUP_IN; *skip_chars = 2;
     } else if (!strcmp("<<<", ptr)) {t = TOK_REDIR_HERESTR; *skip_chars = 3;}
 
-    free (ptr);
     return t;
 }
 
@@ -141,14 +142,13 @@ static size_t isnum(const char* s) {
     const int __restrict_view = 3; //max fd: 999
     size_t sz, sz2; (void)sz2;
 
-    buf = strndup(s, __restrict_view);
+    buf = bstrndup(s, __restrict_view);
     sz = strlen(buf); sz2 = sz;
-    if (!isdigit(buf[0])) {if (buf) free(buf); return 0;}
+    if (!isdigit(buf[0])) { return 0;}
     //trim chars
     for (size_t i = 0; i < sz; i++){
         if (!isdigit(buf[i])) {buf[i] = '\0'; sz2 = sz - i - 1; break;}
     }
-    if (buf) free(buf);
     return sz2;
 }
 
@@ -463,22 +463,20 @@ word:
             word_end = s.i;
             if (after_redir) {
                 
-                temp = strndup(temp, (int)n);
+                temp = bstrndup(temp, (size_t)n);
                 curr.number = atoi(temp);
                 curr.type = TOK_REDIR_RHS_FD;
                 curr.str_idx = word_start;
                 push_token(&r, &curr);
-                free(temp);
                 goto init;
             }
             if (scan_redir_type(s.buf + s.i, &curr.number) != TOK_ERROR) {
                 curr = (token_t){0};
-                temp = strndup(temp, (int)n);
+                temp = bstrndup(temp, (size_t)n);
                 curr.number = atoi(temp);
                 curr.type = TOK_REDIR_LHS_FD;
                 curr.str_idx = word_start;
                 push_token(&r, &curr);
-                free(temp);
                 goto init;
             }
             goto word;
@@ -507,7 +505,6 @@ finish_word:
         word_len = strlen(curr.value);
         curr.str_idx = word_start;
         if(word_len)push_token(&r, &curr);
-        else if (curr.value) free(curr.value);
         goto init;
     }
 

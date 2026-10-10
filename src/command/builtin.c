@@ -265,10 +265,10 @@ static char** expand_job_args(int c, char** v, struct file_streams fss, _out_ in
     pid_t pid = -1;
     *err = 0;
 
-    ret = malloc(sizeof(char*) * (c + 1));
+    ret = balloc(sizeof(char*) * (c + 1));
     for(int i = 0; i < c; i++) {
         // Sera suficiente espacio.
-        ret[i] = malloc(strlen(v[i]) + 5);
+        ret[i] = balloc(strlen(v[i]) + 5);
         if (v[i][0] == '%') {
             id = atoi(v[i] + 1);
             if((pid = job_get_pid(id)) == -1) {
@@ -283,12 +283,7 @@ static char** expand_job_args(int c, char** v, struct file_streams fss, _out_ in
     return ret;
 }
 
-static void free_argv(int c, char**v) {
-    for (int i = 0; i < c; i++)
-    {
-        free(v[i]);
-    }if(v)free(v);  
-}
+
 /**
  * Sobreescritura del comando externo kill.
  * sobreescribe el comando para expandir los argumentos '%n'.
@@ -305,7 +300,6 @@ int builtin_kill         (int c, char** v, struct file_streams fss) {
     exp_args = expand_job_args(c, v, fss, &err);
     if(!exp_args) return 127;
     if (err) {
-        if (exp_args)free_argv(c, exp_args);
         return 1;
     }
 
@@ -322,12 +316,10 @@ int builtin_kill         (int c, char** v, struct file_streams fss) {
         setpgid(0, 0);
         execve("/usr/bin/kill", exp_args, environ);
         perror("execve->kill");
-        free_argv(c, exp_args);
         exit(1);
     }
     //proceso padre
     waitpid(pid, &status, 0);
-    free_argv(c, exp_args);
     g_dont_nl = 0;
     return WIFEXITED(status)? WEXITSTATUS(status) : 1;
     
@@ -343,7 +335,6 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     pid_t pid = 0;
     job_t* job = NULL;
     int status;
-    bool need_free = 0;
 
     if (c > 2) {
         MSH_ERR_C("fg: too many arguments");
@@ -358,12 +349,10 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
         exp_args = expand_job_args(c, v, fss, &err);
         if(!exp_args) return 127;
         if (err) {
-            if (exp_args)free_argv(c, exp_args);
             return 1;
         }
         pid = atoi(exp_args[1]);
         job = job_get(pid);
-        need_free = 1;
     }
     // fg -> usar el trabajo de mayor prioridad.
     if (c == 1) {
@@ -376,13 +365,11 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     }
 
     if (!job) {
-        if (need_free)free_argv(c, exp_args);
         MSH_ERR_C("fg: Could find job with pid {%d}", pid);
         return -1;
     }
     if (job->state == DONE) {
         MSH_ERR_C("fg: job [%d] finished.", job->id);
-        if (need_free)free_argv(c, exp_args);
         return -2;
     }
 
@@ -391,7 +378,6 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
         // Continuar el trabajo
         if (kill(-pid, SIGCONT) == -1) {
             MSH_ERR_C("fg: cannot resume job [%d] {%d}", job->id, pid);
-            if (need_free)free_argv(c, exp_args);
             return 1;
         }
     }
@@ -414,7 +400,6 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
             job->state = STOPPED;
             job->background = 1;
             MSH_LOG("job [%d] %d (Stopped)", job->id, job->pgid);
-            if (exp_args && need_free)free_argv(c, exp_args);
             return 0;
         }
     }
@@ -428,7 +413,6 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
         job_rm(job->pgid);
     }
 
-    if (need_free)free_argv(c, exp_args);
     return 0L;
 
 }

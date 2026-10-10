@@ -29,6 +29,7 @@
 #include <heredoc.h>
 #include <parser_utils.h>
 #include <scanner.h>
+#include "../allocator.h"
 
 
 

@@ -31,7 +31,7 @@ endif
 
 # address sanitizer
 ifdef ASAN
-CCFLAGS += -fsanitize=address,undefined
+CCFLAGS += -fsanitize=leak -static-libasan
 endif
 
 # --------------- COLORES -------------------------

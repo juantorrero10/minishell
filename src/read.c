@@ -37,7 +37,7 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
     remaining++;
     
     // Permitir varias lineas con '\'
-    while (buff[total - 1] == '\\' && remaining > 0) {
+    while (total != 0 && buff[total - 1] == '\\' && remaining > 0) {
         if (print_prompt) {
             M_COLOR_GREY(stdout);
             fprintf(stdout, ">\t\t\t\t");
@@ -77,8 +77,6 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
         sprintf(buff, "%d", ret);
         setenv("status", buff, 1);
         
-
-        ast_free(a);
 
         // señal de salida = 1 -> salir de la shell con código ret.
         if (g_exit_signal == 1) {

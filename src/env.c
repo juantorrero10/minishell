@@ -109,8 +109,8 @@ char* env_expand_string(
         }
         size_t new_len = new_sz + buff->len;
         if (new_len >= buff->cap) {
+            balloc(buff->cap);
             buff->cap *= 2;
-            buff->data = realloc(buff->data, buff->cap);
         }
         if (!just_concat) {
             expansion_pass(og, buff->data + buff->len, true);
@@ -121,7 +121,7 @@ char* env_expand_string(
         }
         return buff->data;
     }
-    char* new = malloc(new_sz);
+    char* new = balloc(new_sz);
     expansion_pass(og, new, true);
     return new;
 }
@@ -140,7 +140,6 @@ void env_expand_redirs(ast_node_redir_t* redirs, size_t nredirs) {
                 continue;
             }
             // Replace string
-            free(redirs[i].target.filename);
             redirs[i].target.filename = new_string;
         }
     }

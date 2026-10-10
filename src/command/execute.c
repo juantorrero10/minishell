@@ -190,7 +190,6 @@ static error_t execute_ast(
                     return err;
                 }
                 ret = execute_ast(tree->node.grp.children, fds, &new, inherited_job, background);
-                free(new.data);
             }
             if (grp->group_type == GROUP_SUBSHELL) {
                 exit(ret);
@@ -280,10 +279,11 @@ L1:
         char* delim = rd->target.delimiter;
         size_t delim_sz = strlen(rd->target.delimiter);
         struct env_growable_string buff = {
-            .data = malloc(sizeof(char) * INPUT_LINE_MAX),
+            .data = balloc(sizeof(char) * INPUT_LINE_MAX),
             .cap = INPUT_LINE_MAX,
             .len = 0
         };
+        benable_alignment(false);
         char line_buff[INPUT_LINE_MAX];
         bool is_atty = isatty(STDOUT_FILENO);
         
@@ -307,11 +307,12 @@ L1:
         if (new_fd < 0) {
             MSH_ERR("couldn't create the heredoc: %s", strerror(errno));
             g_abort_execution = 1;
+            benable_alignment(true);
             return EXIT_ERROR_HERESTR;
         }
+        benable_alignment(true);
         dup2(new_fd, 0);
         close(new_fd);
-        free(buff.data);
         break;
     default:
         MSH_ERR("unknown redirection type or not supported yet.");
@@ -337,7 +338,8 @@ static char* find_binary_path(const char* name) {
     size_t needed           = 0;
     size_t len_dir          = 0;
     size_t len_name         = 0;
-    
+    size_t old_brk          = bget_brk();
+
 
     if (!name || !*name)
         return NULL;
@@ -345,7 +347,7 @@ static char* find_binary_path(const char* name) {
     // If the name already contains a '/', treat it literally.
     if (strchr(name, '/')) {
         if (access(name, X_OK) == 0)
-            return strdup(name);
+            return bstrdup(name);
         return NULL;
     }
 
@@ -354,7 +356,7 @@ static char* find_binary_path(const char* name) {
         return NULL;
 
     // Duplicate PATH because strtok modifies it
-    path = strdup(path_env);
+    path = bstrdup(path_env);
     if (!path)
         return NULL;
 
@@ -366,11 +368,7 @@ static char* find_binary_path(const char* name) {
 
         // Allocate buffer for: dir + '/' + name + '\0'
         needed = len_dir + 1 + len_name + 1;
-        full = malloc(needed);
-        if (!full) {
-            free(path);
-            return NULL;
-        }
+        full = balloc(needed);
 
         // dir/name
         strcpy(full, dir);
@@ -379,15 +377,15 @@ static char* find_binary_path(const char* name) {
 
         // if exec.
         if (access(full, X_OK) == 0) {
-            free(path);
-            return full;
+            bset_brk(old_brk);
+            return bstrdup(full);
         }
 
-        free(full);
+        bfree(needed);
         dir = strtok_r(NULL, ":", &saveptr);
     }
 
-    free(path);
+    bset_brk(old_brk);
     return NULL;
 }
 
@@ -416,10 +414,8 @@ static error_t execute_command(
     
     // argument expansion
     for (size_t i = 0; i < (size_t)cmd->argc; i++) {
-
         char* new = env_expand_string(cmd->argv[i], NULL);
         if (new) {
-            free(cmd->argv[i]);
             cmd->argv[i] = new;
         }
     }
@@ -541,7 +537,6 @@ static error_t execute_command(
         job->pgid = pid;
     }
     setpgid(pid, job->pgid);
-    free(bin_path);
     return 0;
 }
 
@@ -601,7 +596,8 @@ static error_t combine_grp_redirs(
     if (r1) env_expand_redirs(r1->data, r1->sz);
     if (r2) env_expand_redirs(r2->data, r2->sz);
 
-    ast_node_redir_t* new = calloc(r1->sz + r2->sz, sizeof(ast_node_redir_t));
+    size_t alloc_sz = (r1->sz + r2->sz) * sizeof(ast_node_redir_t);
+    ast_node_redir_t* new = balloc(alloc_sz);
     if (r1->sz && r1->data) {
         memcpy(new, r1->data, r1->sz * sizeof(ast_node_redir_t));
         for (size_t i = 0; i < r1->sz; i++) {
@@ -628,6 +624,6 @@ static error_t combine_grp_redirs(
     return 0;
 
 __error_exit:
-    free(new);
+    bfree(alloc_sz);
     return err;
 }

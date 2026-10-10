@@ -31,7 +31,7 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
         find_redirs(arr, cmdline, &nredirs);
     } else {nredirs = *__nredirs;}
 
-    redir_arr = malloc(sizeof(ast_node_redir_t) * nredirs);
+    redir_arr = balloc(sizeof(ast_node_redir_t) * nredirs);
 
     /**
      * Grammar for redirs.
@@ -164,14 +164,11 @@ static ast_node_redir_t* parse_redirections(token_arr* arr, const char* cmdline,
 
 __redir_abort:
     g_abort_ast = 1;
-    free(curr_rd->target.filename);
-    free(redir_arr);
     return NULL;
 }
 
 #define CHECK_ABORT(ret) \
     if (g_abort_ast) {\
-        ast_free((ret));\
         return NULL;\
     }\
 
@@ -225,7 +222,6 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     idx_cmdsub = find_cmd_sub(&view);
     if (idx_cmdsub != -1) {
         // abort because they are not supported yet.
-        ast_free(ret);
         ret = NULL;
         error_parse(ERR_UNEXP, ptr + strloc(arr, idx_cmdsub));
         error_clarify("Cmd subtitutions are not supported yet.");
@@ -245,13 +241,13 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
         // Stop when encounter a redir
         else if (categorize_token(tok_type(arr, idx)) == TC_REDIR || tok_type(arr, idx) == TOK_REDIR_LHS_FD) {break;}
         // Error if other thing (Im not sure if this is ever going to be true).
-        else {error_parse(ERR_UNEXP, ptr + strloc(arr, idx)); if(!locate_at)free(ret); g_abort_ast = 1; return NULL;}
+        else {error_parse(ERR_UNEXP, ptr + strloc(arr, idx)); g_abort_ast = 1; return NULL;}
         idx++;
     }
 
     // STEP 2: make the fucking argvs
     cmd.argc = argc;
-    cmd.argv = malloc(sizeof(char*) * (argc + 1)); // +1 null terminated string.
+    cmd.argv = balloc(sizeof(char*) * (argc + 1)); // +1 null terminated string.
     if (!cmd.argv) { /* handle oom if you want */ }
     cmd.argv[argc] = NULL;
     idx = 0;
@@ -276,9 +272,9 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
             }
             if (total_len == 0) {
                 /* empty quoted string -> empty arg */
-                cmd.argv[argc] = strdup("");
+                cmd.argv[argc] = bstrdup("");
             } else {
-                buf = malloc(total_len + 1);
+                buf = balloc(total_len + 1);
                 p = 0;
                 first = 1;
                 j = idx + 1;
@@ -372,9 +368,6 @@ static ast_t* parse_group(token_arr* arr, const char* cmdline) {
 
     return ret;
 __group_abort:
-    // attach it so it gets freed
-    ret->node.grp = grp;
-    ast_free(ret);
     g_abort_ast = 1;
     return NULL;
 }
@@ -405,7 +398,6 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
         }
         if (semi_end) {
             view_left = make_arr_view(arr, 0, arr->count - temp);
-            ast_free(ret);
             return parse_generic(&view_left, cmdline, NULL);
             if (g_abort_ast) goto __list_abort;
         }
@@ -431,11 +423,8 @@ static ast_t* parse_list(token_arr* arr, int idx, const char* cmdline) {
     return ret;
 __list_abort:
     g_abort_ast = 1;
-    ast_free(sep.left);
-    ast_free(sep.right);
     sep.left = NULL;
     sep.right = NULL;
-    ast_free(ret);
     return NULL;
 }
 
@@ -492,7 +481,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
             (!type_in_list(tok_type(arr, idx), allowed, allowed_sz)) && cmd_sub <= 0
             && (tc != TC_REDIR && tc != TC_RD_ST))
             { error_parse(ERR_UNEXP, ptr + strloc(arr, idx));
-            free(ret); g_abort_ast = 1; return NULL;}
+            g_abort_ast = 1; return NULL;}
         idx++;
     }
     ppl_end = idx-1;
@@ -502,7 +491,7 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     //                           ^ end
     if (!type_in_list(tok_type(arr, ppl_end), allowed, 6)) {
         error_parse(ERR_UNEXP, ptr + strloc(arr, ppl_end));
-        free(ret); g_abort_ast = 1; return NULL;
+        g_abort_ast = 1; return NULL;
     }
 
     idx = 0;
@@ -522,12 +511,10 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
             temp = parse_generic(&view, cmdline, NULL);
             
             if (g_abort_ast || !temp) {
-                if (ppl.elements)free(ppl.elements);
                 goto abort_ppl;
 
             }
             memcpy(ppl.elements + ppl.nelements++, temp, sizeof(ast_t));
-            free(temp);
             cmd_st = idx + 1;
             cmd_end = cmd_st;
         }
@@ -538,7 +525,6 @@ static ast_t* parse_pipeline(token_arr* arr, const char* cmdline) {
     return ret;
 
 abort_ppl:
-    if (ret) { ast_free(ret); }
     g_abort_ast = 1;
     return NULL;
     
@@ -635,10 +621,7 @@ ast_t* parse_string(char* cmdline) {
 
     if (pu_check_balance(cmdline, strlen(cmdline))) return NULL;
     arr = tokenize(cmdline, &sz);
-    if (sz) {
-        token_arr_free(&arr);
-        return NULL;
-    }
+    if (sz) return NULL;
     pu_peek(&arr);
 
     result = parse_generic(&arr, cmdline, NULL);
@@ -646,6 +629,5 @@ ast_t* parse_string(char* cmdline) {
         WARN("parser aborted");
     }
 
-    free(arr.ptr);
     return result;
 }

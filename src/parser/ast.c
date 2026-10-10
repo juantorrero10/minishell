@@ -4,7 +4,7 @@
 
 
 ast_t* ast_create_empty() {
-    ast_t* ret = malloc(sizeof(ast_t));
+    ast_t* ret = balloc(sizeof(ast_t));
     memset(ret, 0, sizeof(ast_t));
     ret->type = AST_INVALID; 
     return ret;
@@ -12,7 +12,7 @@ ast_t* ast_create_empty() {
 
 ast_t* ast_create_array(size_t n_trees) {
     INFO("n_trees");
-    ast_t* t = malloc(sizeof(ast_t) * n_trees);
+    ast_t* t = balloc(sizeof(ast_t) * n_trees);
     memset(t, 0, sizeof(ast_t) * n_trees);
     for (size_t i = 0; i < n_trees; i++) t[i].type = AST_INVALID;
     return t;
