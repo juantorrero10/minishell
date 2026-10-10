@@ -43,4 +43,4 @@ echo "Waiting for jobs to finish"
 fg %3 >& /dev/null
 fg %1 >& /dev/null
 fg %2 >& /dev/null
-exit
+exit -f

@@ -1,6 +1,7 @@
 #include <minishell.h>
 
 int main(int argc, char** argv) {
+	binit();
 	bool print_prompt = true;
 	init_minishell(argc, argv);
 	if (argc > 1 && !strcmp(argv[1], "-s")) print_prompt = false;
@@ -8,6 +9,8 @@ int main(int argc, char** argv) {
 	char buff[INPUT_LINE_MAX];
 	while(1) {
 		read_line_input(buff, INPUT_LINE_MAX, print_prompt);
+		breset();
 	}
+	bexit();
 	return EXIT_SUCCESS;
 }

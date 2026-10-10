@@ -32,6 +32,7 @@
 #include <init.h>
 #include <env.h>
 #include <signals.h>
+#include <allocator.h>
 #include <command/execute.h>
 #include <command/builtin.h>
 #include <command/job.h>

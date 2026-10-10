@@ -259,7 +259,7 @@ static ast_t* parse_simple_command(token_arr* arr, const char* cmdline, _opt_ vo
     while (tok_type(arr, idx) != TOK_EOL && idx < (int)arr->count)
     {
         if (tok_type(arr, idx) == TOK_WORD) {
-            cmd.argv[argc] = strdup(arr->ptr[idx].value);
+            cmd.argv[argc] = arr->ptr[idx].value;
             idx++; argc++;
             continue;
         }
@@ -633,9 +633,12 @@ ast_t* parse_string(char* cmdline) {
     }
     
 
-    if (pu_check_balance(cmdline, strlen(cmdline)))return NULL;
+    if (pu_check_balance(cmdline, strlen(cmdline))) return NULL;
     arr = tokenize(cmdline, &sz);
-    if (sz) goto clean_exit;
+    if (sz) {
+        token_arr_free(&arr);
+        return NULL;
+    }
     pu_peek(&arr);
 
     result = parse_generic(&arr, cmdline, NULL);
@@ -643,7 +646,6 @@ ast_t* parse_string(char* cmdline) {
         WARN("parser aborted");
     }
 
-clean_exit:
-    token_arr_free(&arr);
+    free(arr.ptr);
     return result;
 }

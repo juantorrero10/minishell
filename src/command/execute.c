@@ -416,13 +416,6 @@ static error_t execute_command(
     
     // argument expansion
     for (size_t i = 0; i < (size_t)cmd->argc; i++) {
-        size_t len = strlen(cmd->argv[i]);
-        // If wrapped in single quotes, do not expand
-        // Second check is probably useless since i doubt the parse lets you
-        // have and unterminated single quote
-        // TODO: remove the '
-        if (cmd->argv[i][0] == '\'' && cmd->argv[i][len - 1] == '\'')
-            continue;
 
         char* new = env_expand_string(cmd->argv[i], NULL);
         if (new) {
@@ -617,8 +610,8 @@ static error_t combine_grp_redirs(
                 // Truncate the file here so that it only gets truncated once.
                 // Otherwise it will get the truncated for every command inside a group.
                 int ret = truncate(r->target.filename, 0);
-                // We don't care if the file does not exist.
-                if (ret != 0 && errno != ENOENT) {
+                // We don't care if the file does not exist or truncation is not applicable (ex: /dev/null).
+                if (ret != 0 && errno != ENOENT && errno != EINVAL) {
                     err = EXIT_ERROR_OPENING_FILE;
                     MSH_ERR("couldn't truncate file '%s': %s", r->target.filename, strerror(errno));
                     goto __error_exit;

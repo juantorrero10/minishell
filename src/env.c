@@ -82,6 +82,16 @@ char* env_expand_string(
     if (!og || !(og[0])) {
         return NULL;
     }
+
+    if (!buff) {
+        /**
+         * In parset/tokenizer.c::carve_word()
+         * An extra byte is alloced to determine if the string needs to be expanded
+         */
+        size_t len = strlen(og);
+        bool needs_expansion = (bool)(*(unsigned char*)(og + len + 1));
+        if (!needs_expansion) return NULL;
+    }
     
     // First pass: figure out allocation size
     size_t new_sz = expansion_pass(og, NULL, false);

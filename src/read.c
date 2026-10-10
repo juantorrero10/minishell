@@ -83,6 +83,7 @@ int read_line_input(char* buff, size_t max, bool print_prompt) {
         // señal de salida = 1 -> salir de la shell con código ret.
         if (g_exit_signal == 1) {
             INFO("exit signal=1");
+	        bexit();
             exit(ret);
         }
         // señal de salida = 2 -> se ha cancelado el diálogo de salida.

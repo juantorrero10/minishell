@@ -436,7 +436,7 @@ void get_word(token_arr* arr, int idx, char** output) {
     int i = 0;
 
     if (tok_type(pview, 0) == TOK_WORD) {
-        *output = strdup(view.ptr[0].value);
+        *output = view.ptr[0].value;
     } // IF word is "", check for cmd subs
     else if (tok_type(pview, 0) == TOK_DQ_START) {
         while(tok_type(pview, i+1) != TOK_DQ_END) {
@@ -447,7 +447,7 @@ void get_word(token_arr* arr, int idx, char** output) {
                 return;
             }
         }
-        *output = strdup(view.ptr[i].value);
+        *output = view.ptr[i].value;
     } else if (tok_type(pview, 0) == TOK_CMD_ST_START) {
         error_parse(-1, "cmd substitutions are now allowed for now.");
         return;

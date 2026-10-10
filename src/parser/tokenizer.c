@@ -43,6 +43,8 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
     token_t ret = { .type = TOK_WORD, .number = 0, .value = NULL };
     size_t len = we - ws + 1;
     size_t cws = ws;
+    size_t sz;
+    bool squote_last;
     char* temp = cmdline + ws; (void)temp;
 
     // Bounds check
@@ -59,14 +61,25 @@ static token_t carve_word(char *cmdline, size_t ws, size_t we) {
         else break;
     }
 
-    // trim single quotes
-    // if (cmdline[ws] == '\'') {
-    //     ws++;
-    //     squote_last = 1;
-    // }
+    if (cmdline[ws] == '\'') {
+        ws++;
+        squote_last = 1;
+    }
     
-    ret.value = strndup(cmdline + ws, we - ws);
-    // if (ret.value[sz-1] == '\'' && squote_last) {ret.value[sz-- - 1] = 0;}
+    // + 1 -> Null termination
+    // + 1 -> Encode into a byte after the null termination
+    // whether if this string needs to be expanded 
+    ret.value = malloc(we - ws + 1 + 1);
+    memcpy(ret.value, cmdline + ws, we - ws);
+    sz = we - ws;
+    ret.value[sz] = '\0';
+    unsigned char* needs_expansion = (unsigned char*)(ret.value + sz + 1);
+    if (ret.value[sz-1] == '\'' && squote_last) {
+        ret.value[sz-- - 1] = '\0';
+        *needs_expansion = false;
+    } else {
+        *needs_expansion = true;
+    }
     ret.str_idx = ws;
     return ret;
 }
