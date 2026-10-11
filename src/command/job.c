@@ -197,7 +197,7 @@ job_state job_get_status(pid_t pgid) {
         return DONE;
     }
     memset(buff, 0, (size_t)256);
-    read(fd, buff, 256);
+    read(fd, buff, 255);
     close(fd);
     if ((sz = strlen(buff)) == 0) {
         return -1;

@@ -4,7 +4,12 @@
  * @brief Handler de SIGINT (Ctrl + C) que no hace nada relevante.
  */
 void sigint_handler(int sig) {
-    (void)sig; fflush(stdout);
+    (void)sig;
+    rl_cleanup_after_signal();
+    rl_crlf();
+    rl_replace_line("", 0);
+    rl_on_new_line();
+    rl_redisplay();
 }
 
 /**
@@ -37,7 +42,7 @@ void sigint_handler(int sig) {
         }
 
         if (all_done) {
-            if (!g_dont_nl)printf("\n");
+            printf("\n");
             MSH_LOG("job [%d] '%s' done\t{%d}", j->id, j->cmdline, j->pgid);
             INFO("DONE: %d", DONE);
             j->state = DONE;

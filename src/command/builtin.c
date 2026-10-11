@@ -71,14 +71,12 @@ int builtin_exit (int c, char** v, struct file_streams fss){
                 return 1;
             }
         }
-        g_dont_nl = 1;
         curr = g_bgjob_list;
         do {
             kill(curr->pgid, SIGKILL);
             curr = curr->next; 
         } while (curr);
         job_update_status();
-        g_exit_signal = 1;
         return code;
     }
     g_exit_signal = 1;
@@ -296,7 +294,6 @@ int builtin_kill         (int c, char** v, struct file_streams fss) {
     pid_t pid = 0;
     int status = 0;
 
-    g_dont_nl = 1;
     exp_args = expand_job_args(c, v, fss, &err);
     if(!exp_args) return 127;
     if (err) {
@@ -320,7 +317,6 @@ int builtin_kill         (int c, char** v, struct file_streams fss) {
     }
     //proceso padre
     waitpid(pid, &status, 0);
-    g_dont_nl = 0;
     return WIFEXITED(status)? WEXITSTATUS(status) : 1;
     
 }
@@ -387,6 +383,7 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
     M_COLOR_RESET(fss.out); putc('\n', fss.out);
 
     // Darle al trabajo el control de la terminal
+    rl_deprep_terminal();
     tcsetpgrp(STDIN_FILENO, pid);
 
     // Esperar a que termine.
@@ -397,6 +394,8 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
         // Si se vuelve a detener.
         if (WIFSTOPPED(status)) {
             tcsetpgrp(STDIN_FILENO, getpid());
+            rl_prep_terminal(0);
+            rl_reset_line_state();
             job->state = STOPPED;
             job->background = 1;
             MSH_LOG("job [%d] %d (Stopped)", job->id, job->pgid);
@@ -406,7 +405,8 @@ int builtin_fg   (int c, char** v, struct file_streams fss){ (void)c; (void)v; (
 
     // Devolver el control de la terminal al shell.
     tcsetpgrp(STDIN_FILENO, getpid());
-
+    rl_prep_terminal(0);
+    rl_reset_line_state();
 
     // Eliminar el trabajo de la lista.
     if (job->state != STOPPED) {
@@ -422,5 +422,12 @@ int builtin_getpid(int c, char** v, struct file_streams fss){
     M_COLOR_GREEN(fss.out);
     fprintf(fss.out, "%d", getpid());
     M_COLOR_RESET(fss.out); fputc('\n', fss.out);
+    return 0;
+}
+
+int builtin_reload(int c, char** v, struct file_streams fss) {
+    (void)c; (void)v; (void)fss;
+    char* argv[] = {"minishell", NULL};
+    init_minishell(1, argv);
     return 0;
 }

@@ -97,13 +97,11 @@ static error_t execute_ast(
             if (e < 0) {
                 return e;
             }
-            g_dont_nl = 1;
             cmd_exit_t exit_code = e;
             // Only wait for the job if we are not inheriting
             if (used_job == &new_job && wait) {
                 exit_code = job_wait(used_job);
             }
-            g_dont_nl = 0;
             return exit_code; 
         }
         case AST_PIPELINE:
@@ -284,23 +282,22 @@ L1:
             .len = 0
         };
         benable_alignment(false);
-        char line_buff[INPUT_LINE_MAX];
-        bool is_atty = isatty(STDOUT_FILENO);
         
         while(1) {
-            if (is_atty) {
-                M_COLOR_GREY(stdout);
-                fprintf(stdout, ">  ");
-                M_COLOR_RESET(stdout);
-            }
-            fgets(line_buff, INPUT_LINE_MAX, stdin);
-
-            size_t sz = strlen(line_buff);
-            if (sz > 0 && line_buff[sz - 1] == '\n') sz--;
-            if (delim_sz == sz && !strncmp(delim, line_buff, sz)) {
+            char* line;
+            size_t sz = read_additional_line(&line);
+            if (delim_sz == sz && !strncmp(delim, line, sz)) {
                 break;
             }
-            env_expand_string(line_buff, &buff);
+            env_expand_string(line, &buff);
+            // add a trailing \r\n
+            if (buff.len + 2 >= buff.cap) {
+                balloc(buff.cap);
+                buff.cap <<= 1;
+            }
+            buff.data[buff.len++] = '\r';
+            buff.data[buff.len++] = '\n';
+            free(line);
         }
         buff.data[buff.len] = '\0';
         new_fd = create_buff_fd(buff.data);

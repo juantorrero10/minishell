@@ -3,6 +3,18 @@
 
 int g_abort_ast = 0;
 
+static inline ast_t* ast_create_empty() {
+    ast_t* ret = bcalloc(1, sizeof(ast_t));
+    ret->type = AST_INVALID; 
+    return ret;
+}
+
+static inline ast_t* ast_create_array(size_t n_trees) {
+    ast_t* t = bcalloc(n_trees, sizeof(ast_t));
+    for (size_t i = 0; i < n_trees; i++) t[i].type = AST_INVALID;
+    return t;
+}
+
 
 // forward declaration.
 static ast_t* parse_generic(token_arr* arr, const char* cmdline, _opt_ void* locate_at);

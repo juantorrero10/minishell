@@ -17,7 +17,6 @@
 size_t g_num_envvars = 0;
 int g_last_error_code = 0;
 int g_exit_signal = 0;
-bool g_dont_nl = 0;
 bool g_background = 0;
 bool g_internal = 0;
 bool g_abort_execution = 0;
@@ -25,6 +24,7 @@ bool g_last_ppl_element = 0;
 job_llist g_bgjob_list = NULL;
 size_t g_sz_jobs = 0;
 char* g_overwrite_external[] = {"kill", NULL};
+void (*g_prompt_push_fptr)(void) = NULL;
 builtin_t g_builtin_function_table[] = {
         {"exit", builtin_exit},
         {"cd", builtin_chdir},
@@ -36,6 +36,7 @@ builtin_t g_builtin_function_table[] = {
         {"unset", builtin_unset},
         {"kill", builtin_kill}, // Sobreescrito.
         {"getpid", builtin_getpid},
+        {"reload", builtin_reload},
         {NULL, NULL}
     };
 
@@ -56,7 +57,7 @@ static void init_install_signals(void) {
     action1.sa_flags = 0;
     action2.sa_flags = 0;
 
-    // Reemplazar el handle por defecto por el nuestro, que no hace nada.
+    rl_catch_signals = 0;
     if (sigaction(SIGINT, &action1, NULL) == -1) {
         perror("sigaction, SIGINT");
         exit(1);
@@ -104,11 +105,31 @@ static int init_shell_env(const char *argv0) {
     return 0;
 }
 
+static void* g_prompt_so_handle = NULL;
+
+static void close_dll() { if (g_prompt_so_handle) dlclose(g_prompt_so_handle); }
+
+static void init_prompt_function() {
+    if (g_prompt_so_handle) dlclose(g_prompt_so_handle);
+    void* handle = dlopen("./prompt.so", RTLD_LAZY);
+    if (!handle) {
+        return;
+    }
+    g_prompt_so_handle = handle;
+    atexit(close_dll);
+    void* pp_fn = dlsym(handle, "prompt_push");
+    if (!pp_fn) {
+        MSH_ERR("Loaded 'prompt.so' but symbol 'prompt_push' couldn't be found.");
+        return;
+    }
+    g_prompt_push_fptr = pp_fn;
+}
 
 void init_minishell(int argc, char** argv) {
     (void)argc;
     size_t idx = 0;
     init_install_signals();
+    init_prompt_function();
     if (init_shell_env(argv[0]) == -1) WARN("$SHELL was no updated.");
 
     //Obtener el numero de variables de entorno

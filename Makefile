@@ -23,6 +23,8 @@ OBJ := $(OBJ_MAIN) $(OBJ_PARSER)
 BIN=$(BIN_DIR)/$(TARGET)
 
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
+LIB = readline history
+LIB_FLAGS = $(addprefix -l, $(LIB)) -rdynamic
 
 # modo debug
 ifdef DEBUG
@@ -31,7 +33,7 @@ endif
 
 # address sanitizer
 ifdef ASAN
-CCFLAGS += -fsanitize=leak -static-libasan
+CCFLAGS += -fsanitize=address,undefined
 endif
 
 # --------------- COLORES -------------------------
@@ -48,7 +50,7 @@ all:$(BIN)
 $(BIN): $(OBJ) | $(BIN_DIR) $(OBJ_DIR)
 	@echo "$(CYAN)--------------------------------------------------------------------------"
 	@echo "	Linking: $(RED)$< $(CYAN)-> $(GREEN)$@$(WHITE)"
-	$(CC) $(CCFLAGS) -o $@ $(OBJ)
+	$(CC) $(CCFLAGS) -o $@ $(OBJ) $(LIB_FLAGS)
 	@echo " "
 
 # Build modules

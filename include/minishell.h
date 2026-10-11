@@ -23,6 +23,10 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <dlfcn.h>
+
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include <parser/public.h>
 

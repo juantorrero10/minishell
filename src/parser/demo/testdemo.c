@@ -31,9 +31,8 @@ int main(int argc, char** argv)
             test_ast_to_string(a, buff2, 2048, 1, 1);
             TOKAY("Generated AST: \n%s", buff2);
             memset(buff2, 0, 2048);
-            ast_free(a);
-            free(a);
         }
+        breset();
     }
     
     if (test) test_start_test((argc < 2)? "tests/cherrypick.txt" : argv[1], out);

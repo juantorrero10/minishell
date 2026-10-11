@@ -28,9 +28,6 @@ typedef int cmd_exit_t;
 
 cmd_exit_t execute_line(ast_t* tree, const char* cmdline);
 
-// Flag para controlar los saltos de linea.
-extern bool g_dont_nl;
-
 // Flag -> comando actual en background
 extern bool g_background; 
 

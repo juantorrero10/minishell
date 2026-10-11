@@ -19,14 +19,11 @@
 #include <ctype.h>
 
 
-#include <heredoc.h>
 #include <errors.h>
 #include <token.h>
 #include <ast.h>
 #include <tokenizer.h>
 #include <parser.h>
-#include <redir.h>
-#include <heredoc.h>
 #include <parser_utils.h>
 #include <scanner.h>
 #include "../allocator.h"

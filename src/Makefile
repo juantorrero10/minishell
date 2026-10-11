@@ -14,14 +14,11 @@ SRC_DIR=.
 # archivos .c fuente
 SRC = main.c read.c prompt.c init.c allocator.c env.c signals.c command/execute.c command/builtin.c command/job.c
 
-# archivos .a en $LIB_DIR sin prefijo lib ni extensión .a
-
-LIB_FLAGS = $(addprefix -l, $(LIB))
-
 OBJ=$(SRC:%.c=$(OBJ_THIS)/%.o)
 BIN=$(BIN_DIR)/$(TARGET)
 
 CCFLAGS = -Wall -Werror -Wextra -g -m64 -std=c17 -I$(INC_DIR)
+
 
 # modo debug
 ifdef DEBUG

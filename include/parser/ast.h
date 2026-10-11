@@ -112,12 +112,4 @@ struct _ast_generic_type {
     }node;
 };
 
-void ast_free(ast_t* a);
-void ast_free_redir(ast_node_redir_t* rd);
-
-#ifdef COMPILING_PARSER
-    ast_t* ast_create_empty();
-    ast_t* ast_create_array(size_t n_trees);
-#endif
-
 #endif // PARSER_AST_H_

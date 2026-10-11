@@ -3,65 +3,87 @@
 
 #include <parser/public.h>
 
-int read_line_input(char* buff, size_t max, bool print_prompt) {
-    size_t buff_len = 0;
-    size_t remaining = 0;
-    size_t total = 0;
-    char buff2[INPUT_LINE_MAX];
-    int ret = 0;
 
+static bool g_print_prompt = true;
+
+size_t read_additional_line(_out_ char** ptr) {
+    if (!ptr) return 0;
+    if (g_print_prompt) {
+        prompt_clear();
+        PROMPT_COLOR_GREY();
+        prompt_append_str("> ");
+        PROMPT_COLOR_RESET();
+    }
+    *ptr = readline(prompt_get());
+    return strlen(*ptr);
+}
+
+int read_line_input(char* buff, size_t max, bool print_prompt) {
+    size_t line_len = 0;
+    size_t total = 0;
+    int ret = 0;
+    
+    g_print_prompt = print_prompt;
     // Imprimir el "prompt"
     if (print_prompt) {
-        PROMPT_PRINT();
+        prompt_clear();
+        if (g_prompt_push_fptr) {
+            g_prompt_push_fptr();
+        } else {
+            DEFAULT_PROMPT_PUSH();
+        }
     }
-    fgets(buff, max, stdin);
+    char* line = readline(prompt_get());
+    
+    // EOF
+    if (!line) {
+        rl_on_new_line();
+        exit(g_last_error_code);
+    }
 
-    /** Si hay un caracter '\n' al final significa que el usuario 
-    *   ha querido ejecutar este commando.
-    * 
-    *   Si no lo hay se puede haber producido un SIGINT o SIGTSTP y se 
-    *   descarta lo que hay escrito.
-    */
-
-    buff_len = strlen(buff);
-    remaining= INPUT_LINE_MAX - (buff_len + 1);
-    // Ignorar lineas que no acaban en '\n' o que empiezan con '#' (comentarios)
-    if (buff[buff_len - 1] != '\n' || buff[0] == '#') 
-    {
-        fputc('\n', stdout);
+    // Ignorar lineas que que empiezan con '#' (comentarios)
+    if (line[0] == '#') {
         return 0;
     }
-    buff[buff_len - 1] = '\0';
-    buff_len--;
-    total = buff_len;
-    remaining++;
+    total = strlen(line);
+    strcpy(buff, line);
+    free(line);
     
     // Permitir varias lineas con '\'
-    while (total != 0 && buff[total - 1] == '\\' && remaining > 0) {
-        if (print_prompt) {
-            M_COLOR_GREY(stdout);
-            fprintf(stdout, ">\t\t\t\t");
-            M_COLOR_RESET(stdout);
-        }
+    size_t i = 0;
+    while (i < total) {
+        char* s = strstr(buff + i, "\\\n");
+        if (!s) break;
+        i = (size_t)((uintptr_t)s - (uintptr_t)buff);
+        memmove(s, s + 2, total - i - 2 + 1); // +1 copy Null termination as well
+        total -= 2;
+    }
+    while (total != 0 && buff[total - 1] == '\\') {
         // Eliminar la barra invertida
         buff[total - 1] = '\0';
-        buff_len--; total--; remaining++;
+        line_len--; total--;
+
         // Obtener siguiente linea
-        fgets(buff2, remaining, stdin);
-        buff_len = strlen(buff2);
-        
-        if (buff2[buff_len - 1] == '\n') {
-            buff2[buff_len - 1] = '\0';
-            buff_len--;
-            strcat(buff, buff2);
-            memset(buff2, 0, remaining);
-            remaining -= buff_len;
-            total += buff_len;
-        } else {    //un SIGINT
-            fputc('\n', stdout);
-            return 0;
+        char* add_line;
+        size_t add_len = read_additional_line(&add_line);
+
+        // EOF
+        if (!add_line) {
+            rl_on_new_line();
         }
+        
+        if (total + add_len < max) {
+            strcat(buff, add_line);
+            total += add_len;
+        } else {
+            MSH_ERR("Input line exceeds maximum length (%zu)", max);
+            free(add_line);
+            return -1;
+        }
+        free(add_line);
     }
+
+    add_history(buff);
 
     // tokenizar
     //line = tokenize(buff);

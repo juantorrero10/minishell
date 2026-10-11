@@ -1,7 +1,7 @@
 #ifndef MACROS_H_
 #define MACROS_H_
 
-#define INPUT_LINE_MAX 1024
+#define INPUT_LINE_MAX 2048
 #define PATH_MAX 256
 
 /* Falling through switch cases is used throughout the code 
@@ -25,30 +25,30 @@
 #define is_external(tokens, i) (tokens->commands[i].filename != NULL)
 
 /*------------------ COLOR MACROS ---------------------------------*/
-#define printf_if_std(stream, msg) (isatty(fileno(stream)))? fprintf(stream, msg) : (void)0
+#define print_if_std(stream, msg) (isatty(fileno(stream)))? fprintf(stream, msg) : (void)0
 
-#define M_COLOR_RESET(stream)    printf_if_std(stream, "\033[0m")
-#define M_STYLE_BOLD(stream)     printf_if_std(stream, "\033[1m")
-#define M_STYLE_ITALIC(stream)   printf_if_std(stream, "\033[3m")
-#define M_STYLE_UNDERLINE(stream)   printf_if_std(stream, "\033[4m")
+#define M_COLOR_RESET(stream)    print_if_std(stream, "\033[0m")
+#define M_STYLE_BOLD(stream)     print_if_std(stream, "\033[1m")
+#define M_STYLE_ITALIC(stream)   print_if_std(stream, "\033[3m")
+#define M_STYLE_UNDERLINE(stream)   print_if_std(stream, "\033[4m")
 
-#define M_COLOR_BLACK(stream)       printf_if_std(stream, "\033[30m")
-#define M_COLOR_RED(stream)         printf_if_std(stream, "\033[31m")
-#define M_COLOR_GREEN(stream)       printf_if_std(stream, "\033[32m")
-#define M_COLOR_YELLOW(stream)      printf_if_std(stream, "\033[33m")
-#define M_COLOR_BLUE(stream)        printf_if_std(stream, "\033[34m")
-#define M_COLOR_MAGENTA(stream)     printf_if_std(stream, "\033[35m")
-#define M_COLOR_CYAN(stream)        printf_if_std(stream, "\033[36m")
-#define M_COLOR_WHITE(stream)       printf_if_std(stream, "\033[37m")
-#define M_COLOR_GREY(stream)         printf_if_std(stream, "\033[90m")
+#define M_COLOR_BLACK(stream)       print_if_std(stream, "\033[30m")
+#define M_COLOR_RED(stream)         print_if_std(stream, "\033[31m")
+#define M_COLOR_GREEN(stream)       print_if_std(stream, "\033[32m")
+#define M_COLOR_YELLOW(stream)      print_if_std(stream, "\033[33m")
+#define M_COLOR_BLUE(stream)        print_if_std(stream, "\033[34m")
+#define M_COLOR_MAGENTA(stream)     print_if_std(stream, "\033[35m")
+#define M_COLOR_CYAN(stream)        print_if_std(stream, "\033[36m")
+#define M_COLOR_WHITE(stream)       print_if_std(stream, "\033[37m")
+#define M_COLOR_GREY(stream)         print_if_std(stream, "\033[90m")
 
 
-#define M_COLOR_BRIGHT_RED(stream)     printf_if_std(stream, "\033[91m")
-#define M_COLOR_BRIGHT_GREEN(stream)   printf_if_std(stream, "\033[92m")
-#define M_COLOR_BRIGHT_YELLOW(stream)  printf_if_std(stream, "\033[93m")
-#define M_COLOR_BRIGHT_BLUE(stream)    printf_if_std(stream, "\033[94m")
-#define M_COLOR_BRIGHT_MAGENTA(stream) printf_if_std(stream, "\033[95m")
-#define M_COLOR_BRIGHT_CYAN(stream)    printf_if_std(stream, "\033[96m")
-#define M_COLOR_BRIGHT_WHITE(stream)   printf_if_std(stream, "\033[97m")
+#define M_COLOR_BRIGHT_RED(stream)     print_if_std(stream, "\033[91m")
+#define M_COLOR_BRIGHT_GREEN(stream)   print_if_std(stream, "\033[92m")
+#define M_COLOR_BRIGHT_YELLOW(stream)  print_if_std(stream, "\033[93m")
+#define M_COLOR_BRIGHT_BLUE(stream)    print_if_std(stream, "\033[94m")
+#define M_COLOR_BRIGHT_MAGENTA(stream) print_if_std(stream, "\033[95m")
+#define M_COLOR_BRIGHT_CYAN(stream)    print_if_std(stream, "\033[96m")
+#define M_COLOR_BRIGHT_WHITE(stream)   print_if_std(stream, "\033[97m")
 
 #endif // MACROS_H_

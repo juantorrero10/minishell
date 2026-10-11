@@ -32,6 +32,7 @@ def_builtin(builtin_set);
 def_builtin(builtin_unset);
 def_builtin(builtin_kill);
 def_builtin(builtin_getpid);
+def_builtin(builtin_reload);
 
 
 

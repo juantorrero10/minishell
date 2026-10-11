@@ -3,9 +3,9 @@
 #include <assert.h>
 
 #define ARENA_SIZE 1024 * 1024
-// align allocations to 2 << ALIGN
+// align allocations to 2 ^ ALIGN
 #define ALIGN 3
-#define ALIGN_TO(var, align) var += ((2 << (align)) - ((var) & ((2 << (align)) - 1))) & ((2 << align) - 1);
+#define ALIGN_TO(var, align) var += ((1 << (align)) - ((var) & ((1 << (align)) - 1))) & ((1 << align) - 1);
 
 static void* g_ptr = NULL; 
 static size_t g_size = 0; 

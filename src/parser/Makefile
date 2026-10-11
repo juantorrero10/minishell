@@ -15,7 +15,7 @@ SRC_DIR=.
 
 
 # archivos .c fuente, testdemo.c se eliminará una vez de acabe de desarrollar el parser.
-SRC = ast.c parser.c errors.c heredoc.c tokenizer.c redir.c parser_utils.c scanner.c
+SRC = parser.c errors.c tokenizer.c parser_utils.c scanner.c
 TEST = test_ast
 DEMO_MAIN = testdemo
 

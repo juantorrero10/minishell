@@ -5,7 +5,7 @@
 
 #define ERR_LBL "syntax error"
 #define CLR_LBL "    >>>     "
-#define LPERR(MSG, ...) fprintf(stderr, STYLE_BOLD""COLOR_RED""ERR_LBL": "COLOR_RESET""MSG"\r\n", ##__VA_ARGS__)
+#define LPERR(MSG, ...) fprintf(stderr, STYLE_BOLD""COLOR_RED"minishell: "COLOR_WHITE""ERR_LBL": "COLOR_RESET""MSG"\r\n", ##__VA_ARGS__)
 #define LPCLR(MSG, ...) fprintf(stderr, STYLE_BOLD""COLOR_RED""CLR_LBL": "COLOR_RESET""MSG"\r\n", ##__VA_ARGS__)
 
 typedef enum {

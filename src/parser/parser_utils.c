@@ -1,6 +1,8 @@
 #include <private.h>
 #include <../log.h>
 
+#define MAX(a, b) ((a) < (b)? (b) : (a))
+
 // returns buff for convenience
 char* token_to_string(token_kind tt, char buff[])
 {
@@ -262,7 +264,7 @@ int find_list_sep(token_arr* arr, const char* cmdline, bool __only_semicolon) {
     separator_kind sep = (separator_kind)arr->ptr[idx].type;
     if (sep != SEP_SEMICOLON && sep != SEP_AMP) {
         if (idx == 0 || idx >= (int)arr->count-2) {
-            error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
+            error_parse(ERR_UNEXP, ptr + MAX(arr->ptr[idx].str_idx-1, 0));
             g_abort_ast = 1;
             return -2;
         }
@@ -300,7 +302,7 @@ int find_pipe(token_arr* arr, const char* cmdline) {
 
     // grammar rule: no | at the begining or end of element
     if (idx == 0 || idx >= (int)arr->count-1) {
-        error_parse(ERR_UNEXP, ptr + (arr->ptr[idx].str_idx-1));
+        error_parse(ERR_UNEXP, ptr + MAX(arr->ptr[idx].str_idx-1, 0));
         g_abort_ast = 1;
         return -2;
     }
@@ -345,7 +347,7 @@ int find_redirs(token_arr* arr, const char* cmdline, _out_ int* n_redirs) {
     // Error when fisrt redir is at last pos of the array.
     // grammar rule: redirections need at least another token at the left.
     if (arr->ptr[first+1].type == TOK_EOL || first >= (int)arr->count - 1) {
-        error_parse(ERR_UNEXP, ptr + arr->ptr[first].str_idx-1);
+        error_parse(ERR_UNEXP, ptr + MAX(arr->ptr[first].str_idx-1, 0));
         error_parse(ERR_EXP, "expected fd, filename, string or heredoc delimiter.");
         g_abort_ast = 1;
         return -2;
